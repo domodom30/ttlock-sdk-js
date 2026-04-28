@@ -1,0 +1,57 @@
+'use strict';
+
+import { LogOperate } from './LogOperate';
+
+export const LogOperateCategory = {
+  /** Tous les déverrouillages réussis */
+  UNLOCK: [
+    LogOperate.OPERATE_TYPE_MOBILE_UNLOCK,
+    LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK,
+    LogOperate.OPERATE_TYPE_USE_DELETE_CODE,
+    LogOperate.OPERATE_TYPE_BONG_UNLOCK_SUCCEED,
+    LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED,
+    LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED,
+    LogOperate.OPERATE_KEY_UNLOCK,
+    LogOperate.GATEWAY_UNLOCK,
+    LogOperate.ILLAGEL_UNLOCK,
+    LogOperate.DOOR_SENSOR_UNLOCK,
+    LogOperate.DOOR_GO_OUT,
+    LogOperate.REMOTE_CONTROL_KEY,
+    LogOperate.WIRELESS_KEY_FOB
+  ],
+
+  /** Tous les verrouillages */
+  LOCK: [LogOperate.OPERATE_BLE_LOCK, LogOperate.DOOR_SENSOR_LOCK, LogOperate.FR_LOCK, LogOperate.PASSCODE_LOCK, LogOperate.IC_LOCK, LogOperate.OPERATE_KEY_LOCK],
+
+  /** Tentatives échouées */
+  FAILED: [
+    LogOperate.OPERATE_TYPE_ERROR_PASSWORD_UNLOCK,
+    LogOperate.OPERATE_TYPE_PASSCODE_EXPIRED,
+    LogOperate.OPERATE_TYPE_SPACE_INSUFFICIENT,
+    LogOperate.OPERATE_TYPE_PASSCODE_IN_BLACK_LIST,
+    LogOperate.OPERATE_TYPE_FR_UNLOCK_FAILED,
+    LogOperate.OPERATE_TYPE_IC_UNLOCK_FAILED,
+    LogOperate.PASSCODE_UNLOCK_FAILED_LOCK_REVERSE,
+    LogOperate.IC_UNLOCK_FAILED_LOCK_REVERSE,
+    LogOperate.FR_UNLOCK_FAILED_LOCK_REVERSE,
+    LogOperate.APP_UNLOCK_FAILED_LOCK_REVERSE
+  ],
+
+  /** Gestion codes / mots de passe */
+  PASSCODE: [LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD, LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD, LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS, LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED, LogOperate.ADD_ADMIN_BY_KEYBOARD],
+
+  /** Gestion cartes IC */
+  IC: [LogOperate.OPERATE_TYPE_ADD_IC, LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED, LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED, LogOperate.OPERATE_TYPE_CLEAR_IC_SUCCEED, LogOperate.OPERATE_TYPE_IC_UNLOCK_FAILED, LogOperate.IC_LOCK],
+
+  /** Gestion empreintes digitales */
+  FINGERPRINT: [LogOperate.OPERATE_TYPE_ADD_FR, LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED, LogOperate.OPERATE_TYPE_FR_UNLOCK_FAILED, LogOperate.OPERATE_TYPE_DELETE_FR_SUCCEED, LogOperate.OPERATE_TYPE_CLEAR_FR_SUCCEED, LogOperate.FR_LOCK],
+
+  /** Alarmes et alertes */
+  ALARM: [LogOperate.TAMPER_ALARM, LogOperate.LOW_BATTERY_ALARM, LogOperate.DOOR_NOT_LOCKED_ALARM, LogOperate.DOOR_OPENED_ALARM, LogOperate.DOOR_SENSOR_ANOMALY, LogOperate.KEYBOARD_LOCKED],
+
+  /** Événements système */
+  SYSTEM: [LogOperate.OPERATE_TYPE_DOOR_REBOOT, LogOperate.RESET_BUTTON],
+
+  /** Périphériques sans fil */
+  WIRELESS: [LogOperate.REMOTE_CONTROL_KEY, LogOperate.WIRELESS_KEY_FOB, LogOperate.WIRELESS_KEY_PAD]
+};
