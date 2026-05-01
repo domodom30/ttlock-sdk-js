@@ -91,6 +91,17 @@ export declare class TTLock extends TTLockApi implements TTLock {
      */
     getLockStatus(noCache?: boolean): Promise<LockedStatus>;
     getAutolockTime(noCache?: boolean): Promise<number>;
+    /**
+     * Synchronise l'horloge de la serrure sur l'heure système actuelle.
+     * Équivalent de setLockTime() dans le SDK officiel TTLock.
+     */
+    setLockTime(): Promise<boolean>;
+    /**
+     * Lit l'heure courante de la serrure.
+     * Équivalent de getLockTime() dans le SDK officiel TTLock.
+     * @returns Date — l'heure interne de la serrure
+     */
+    getLockTime(): Promise<Date>;
     setAutoLockTime(autoLockTime: number): Promise<boolean>;
     getLockSound(noCache?: boolean): Promise<AudioManage>;
     /**

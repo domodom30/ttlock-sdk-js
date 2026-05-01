@@ -5,6 +5,7 @@ export { InitCommand } from './InitCommand';
 export { AESKeyCommand } from './AESKeyCommand';
 export { AddAdminCommand } from './AddAdminCommand';
 export { CalibrationTimeCommand } from './CalibrationTimeCommand';
+export { GetLockTimeCommand } from './GetLockTimeCommand';
 export { DeviceFeaturesCommand } from './DeviceFeaturesCommand';
 export { GetSwitchStateCommand } from './GetSwitchStateCommand';
 export { AudioManageCommand } from './AudioManageCommand';

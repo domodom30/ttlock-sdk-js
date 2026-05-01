@@ -9,7 +9,7 @@ export { CommandResponse } from './CommandResponse';
 export { CommandType } from './CommandType';
 export { ConfigRemoteUnlock } from './ConfigRemoteUnlock';
 export { ControlAction } from './ControlAction';
-export { CyclicOpType } from './CyclicOpType';
+export { CyclicOpType, CyclicType, CyclicUserType } from './CyclicOpType';
 export { DateConstant } from './DateConstant';
 export { DeviceInfoEnum } from './DeviceInfoEnum';
 export { FeatureValue } from './FeatureValue';

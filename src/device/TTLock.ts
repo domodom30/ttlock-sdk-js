@@ -515,6 +515,41 @@ export class TTLock extends TTLockApi implements TTLock {
     return this.autoLockTime;
   }
 
+  /**
+   * Synchronise l'horloge de la serrure sur l'heure système actuelle.
+   * Équivalent de setLockTime() dans le SDK officiel TTLock.
+   */
+  async setLockTime(): Promise<boolean> {
+    if (!this.isConnected()) {
+      throw new Error('Lock is not connected');
+    }
+    if (!this.initialized) {
+      throw new Error('Lock is in pairing mode');
+    }
+    try {
+      await this.calibrateTimeCommand();
+      return true;
+    } catch (error) {
+      log.error('setLockTime:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Lit l'heure courante de la serrure.
+   * Équivalent de getLockTime() dans le SDK officiel TTLock.
+   * @returns Date — l'heure interne de la serrure
+   */
+  async getLockTime(): Promise<Date> {
+    if (!this.isConnected()) {
+      throw new Error('Lock is not connected');
+    }
+    if (!this.initialized) {
+      throw new Error('Lock is in pairing mode');
+    }
+    return this.getLockTimeCommand();
+  }
+
   async setAutoLockTime(autoLockTime: number): Promise<boolean> {
     if (!this.isConnected()) {
       throw new Error('Lock is not connected');
@@ -1455,7 +1490,7 @@ export class TTLock extends TTLockApi implements TTLock {
       } else {
         log.warn('getOperationLog: BLE fetch returned no records, keeping existing cache');
       }
-      return this.operationLog;
+      return this.operationLog.filter(Boolean) as LogEntry[];
     } else {
       if (newOperations.length > 0) {
         this.emit('dataUpdated', this);

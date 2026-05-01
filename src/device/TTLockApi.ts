@@ -48,7 +48,8 @@ import {
   AccessoryBatteryCommand,
   AccessoryType,
   UnlockDirectionCommand,
-  UnlockDirection
+  UnlockDirection,
+  GetLockTimeCommand
 } from '../api/Commands';
 import { PassageModeOperate } from '../constant/PassageModeOperate';
 import { AdminType } from './AdminType';
@@ -268,6 +269,33 @@ export abstract class TTLockApi extends EventEmitter {
       }
     } else {
       throw new Error('No response to time calibration');
+    }
+  }
+
+  /**
+   * Read the current time from the lock (COMM_GET_LOCK_TIME 0x34)
+   */
+  protected async getLockTimeCommand(aesKey?: Buffer): Promise<Date> {
+    if (aesKey == undefined) {
+      if (this.privateData.aesKey) {
+        aesKey = this.privateData.aesKey;
+      } else {
+        throw new Error('No AES key for lock');
+      }
+    }
+    const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
+    requestEnvelope.setCommandType(CommandType.COMM_GET_LOCK_TIME);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, true);
+    if (responseEnvelope) {
+      responseEnvelope.setAesKey(aesKey);
+      const cmd = responseEnvelope.getCommand() as GetLockTimeCommand;
+      const lockTime = cmd.getLockTime();
+      if (lockTime == undefined) {
+        throw new Error('Failed to parse lock time response');
+      }
+      return lockTime;
+    } else {
+      throw new Error('No response to getLockTime');
     }
   }
 

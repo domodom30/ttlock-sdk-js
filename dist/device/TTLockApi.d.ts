@@ -75,6 +75,10 @@ export declare abstract class TTLockApi extends EventEmitter {
      */
     protected calibrateTimeCommand(aesKey?: Buffer): Promise<void>;
     /**
+     * Read the current time from the lock (COMM_GET_LOCK_TIME 0x34)
+     */
+    protected getLockTimeCommand(aesKey?: Buffer): Promise<Date>;
+    /**
      * Send SearchDeviceFeature command
      */
     protected searchDeviceFeatureCommand(aesKey?: Buffer): Promise<Set<FeatureValue>>;

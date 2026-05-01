@@ -78,9 +78,8 @@ export class CommandEnvelope {
     }
     command.generateLockType();
 
-    if (typeof aesKey != 'undefined') {
+    if (aesKey != undefined) {
       command.aesKey = aesKey;
-      // command.generateCommand();
     }
 
     return command;
@@ -136,7 +135,6 @@ export class CommandEnvelope {
 
   setAesKey(aesKey: Buffer) {
     this.aesKey = aesKey;
-    // this.generateCommand();
   }
 
   setLockType(lockType: LockType) {
@@ -148,11 +146,7 @@ export class CommandEnvelope {
   }
 
   setCommandType(command: CommandType) {
-    // if (typeof command == "string") {
-    //   command = command.charCodeAt(0);
-    // }
     this.commandType = command;
-    // this.generateCommand();
   }
 
   getCommandType(): CommandType {
@@ -193,12 +187,12 @@ export class CommandEnvelope {
 
   buildCommandBuffer(): Buffer {
     this.generateCommand();
-    if (typeof this.command == 'undefined') {
+    if (this.command == undefined) {
       throw new Error('Command has not been generated');
     }
 
     const data = this.command.build();
-    if (typeof this.aesKey == 'undefined' && data.length > 0) {
+    if (this.aesKey == undefined && data.length > 0) {
       throw new Error('AES key has not been set');
     }
 
@@ -232,18 +226,16 @@ export class CommandEnvelope {
    *
    */
   private generateCommand() {
-    if (this.commandType != CommandType.COMM_UNSET && typeof this.command == 'undefined') {
+    if (this.commandType != CommandType.COMM_UNSET && this.command == undefined) {
       // only generate if no command exists
-      if (typeof this.data != 'undefined') {
-        if (this.data.length > 0 && typeof this.aesKey != 'undefined') {
-          // create a new command using data
-          // this is used for receiving command responses or notifications from the lock
-          this.command = commandFromData(this.getData());
-        }
-      } else {
+      if (this.data == undefined) {
         // create a new blank command from the current commandType
         // this is used for sending commands to the lock
         this.command = commandFromType(this.commandType);
+      } else if (this.data.length > 0 && this.aesKey != undefined) {
+        // create a new command using data
+        // this is used for receiving command responses or notifications from the lock
+        this.command = commandFromData(this.getData());
       }
     }
   }

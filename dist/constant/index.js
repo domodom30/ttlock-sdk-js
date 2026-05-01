@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LogOperateCategory = exports.LogOperateNames = exports.PwdOperateType = exports.PassageModeType = exports.PassageModeOperate = exports.OperationType = exports.LogType = exports.LogOperate = exports.LockSoundVolume = exports.LockedStatus = exports.LockVersion = exports.LockType = exports.KeyboardPwdType = exports.ICOperate = exports.FeatureValue = exports.DeviceInfoEnum = exports.DateConstant = exports.CyclicOpType = exports.ControlAction = exports.ConfigRemoteUnlock = exports.CommandType = exports.CommandResponse = exports.CallbackOperationType = exports.AutoLockOperate = exports.AudioManage = exports.ActionType = exports.APICommand = void 0;
+exports.LogOperateCategory = exports.LogOperateNames = exports.PwdOperateType = exports.PassageModeType = exports.PassageModeOperate = exports.OperationType = exports.LogType = exports.LogOperate = exports.LockSoundVolume = exports.LockedStatus = exports.LockVersion = exports.LockType = exports.KeyboardPwdType = exports.ICOperate = exports.FeatureValue = exports.DeviceInfoEnum = exports.DateConstant = exports.CyclicUserType = exports.CyclicType = exports.CyclicOpType = exports.ControlAction = exports.ConfigRemoteUnlock = exports.CommandType = exports.CommandResponse = exports.CallbackOperationType = exports.AutoLockOperate = exports.AudioManage = exports.ActionType = exports.APICommand = void 0;
 var APICommand_1 = require("./APICommand");
 Object.defineProperty(exports, "APICommand", { enumerable: true, get: function () { return APICommand_1.APICommand; } });
 var ActionType_1 = require("./ActionType");
@@ -21,6 +21,8 @@ var ControlAction_1 = require("./ControlAction");
 Object.defineProperty(exports, "ControlAction", { enumerable: true, get: function () { return ControlAction_1.ControlAction; } });
 var CyclicOpType_1 = require("./CyclicOpType");
 Object.defineProperty(exports, "CyclicOpType", { enumerable: true, get: function () { return CyclicOpType_1.CyclicOpType; } });
+Object.defineProperty(exports, "CyclicType", { enumerable: true, get: function () { return CyclicOpType_1.CyclicType; } });
+Object.defineProperty(exports, "CyclicUserType", { enumerable: true, get: function () { return CyclicOpType_1.CyclicUserType; } });
 var DateConstant_1 = require("./DateConstant");
 Object.defineProperty(exports, "DateConstant", { enumerable: true, get: function () { return DateConstant_1.DateConstant; } });
 var DeviceInfoEnum_1 = require("./DeviceInfoEnum");

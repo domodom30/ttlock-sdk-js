@@ -181,6 +181,34 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     /**
+     * Read the current time from the lock (COMM_GET_LOCK_TIME 0x34)
+     */
+    async getLockTimeCommand(aesKey) {
+        if (aesKey == undefined) {
+            if (this.privateData.aesKey) {
+                aesKey = this.privateData.aesKey;
+            }
+            else {
+                throw new Error('No AES key for lock');
+            }
+        }
+        const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
+        requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_GET_LOCK_TIME);
+        const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, true);
+        if (responseEnvelope) {
+            responseEnvelope.setAesKey(aesKey);
+            const cmd = responseEnvelope.getCommand();
+            const lockTime = cmd.getLockTime();
+            if (lockTime == undefined) {
+                throw new Error('Failed to parse lock time response');
+            }
+            return lockTime;
+        }
+        else {
+            throw new Error('No response to getLockTime');
+        }
+    }
+    /**
      * Send SearchDeviceFeature command
      */
     async searchDeviceFeatureCommand(aesKey) {

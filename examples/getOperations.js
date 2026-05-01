@@ -1,5 +1,6 @@
 'use strict';
 
+const { inspect } = require('node:util');
 const { TTLockClient, LogOperateNames } = require('../dist');
 const settingsFile = 'lockData.json';
 
@@ -29,7 +30,7 @@ async function doStuff() {
       }));
 
       console.log(`Retrieved ${entries.length} operation log entries`);
-      console.log(entries);
+      console.log(inspect(entries, { depth: null, maxArrayLength: null, colors: true }));
 
       await require('./common/saveData')(settingsFile, client.getLockData());
 
