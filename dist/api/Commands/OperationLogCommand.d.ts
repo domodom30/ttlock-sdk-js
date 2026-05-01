@@ -15,7 +15,7 @@ export interface LogEntry {
     keyId?: number;
 }
 export declare class OperationLogCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private sequence?;
     private logs?;
     protected processData(): void;

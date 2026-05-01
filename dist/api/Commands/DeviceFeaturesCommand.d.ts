@@ -1,6 +1,6 @@
-import { CommandType } from "../../constant/CommandType";
-import { FeatureValue } from "../../constant/FeatureValue";
-import { Command } from "../Command";
+import { CommandType } from '../../constant/CommandType';
+import { FeatureValue } from '../../constant/FeatureValue';
+import { Command } from '../Command';
 export declare class DeviceFeaturesCommand extends Command {
     static COMMAND_TYPE: CommandType;
     private batteryCapacity?;

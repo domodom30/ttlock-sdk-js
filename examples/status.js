@@ -12,8 +12,6 @@ async function doStuff() {
   client.startScanLock();
   console.log("Scan started");
   client.on("foundLock", async (lock) => {
-    console.log(lock.toJSON());
-    console.log();
     
     if (lock.isInitialized() && lock.isPaired()) {
       await lock.connect();

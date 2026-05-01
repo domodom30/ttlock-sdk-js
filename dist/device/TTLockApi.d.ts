@@ -144,5 +144,5 @@ export declare abstract class TTLockApi extends EventEmitter {
     protected clearFRCommand(aesKey?: Buffer): Promise<boolean>;
     protected getOperationLogCommand(sequence?: number, aesKey?: Buffer): Promise<OperationLogResponse>;
     protected macro_readAllDeviceInfo(aesKey?: Buffer): Promise<DeviceInfoType>;
-    protected macro_adminLogin(): Promise<boolean>;
+    protected macro_adminLogin(maxRetries?: number, retryDelayMs?: number): Promise<boolean>;
 }

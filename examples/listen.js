@@ -1,35 +1,35 @@
 'use strict';
 
 const { TTLockClient, LogOperate, LockedStatus } = require('../dist');
-const settingsFile = "lockData.json";
+const settingsFile = 'lockData.json';
 
 async function doStuff() {
-  let lockData = await require("./common/loadData")(settingsFile);
-  let options = require("./common/options")(lockData);
+  let lockData = await require('./common/loadData')(settingsFile);
+  let options = require('./common/options')(lockData);
 
   const client = new TTLockClient(options);
   await client.prepareBTService();
   client.startMonitor();
-  console.log("Scan started");
-  client.on("foundLock", async (lock) => {
+  console.log('Scan started');
+  client.on('foundLock', async (lock) => {
     console.log(lock.toJSON());
     console.log();
 
-    lock.on("locked", (l) => {
-      console.log("Lock was locked");
+    lock.on('locked', (l) => {
+      console.log('Lock was locked');
     });
 
-    lock.on("unlocked", (l) => {
-      console.log("Lock was unlocked");
+    lock.on('unlocked', (l) => {
+      console.log('Lock was unlocked');
     });
 
-    lock.on("updated", async (l, p) => {
+    lock.on('updated', async (l, p) => {
       if (p.newEvents && l.hasNewEvents()) {
         if (!l.isConnected()) {
-          console.log("Reconnecting to lock to read log");
+          console.log('Reconnecting to lock to read log');
           const res = await l.connect();
-          if (res == false) {
-            console.log("Unable to connect to lock");
+          if (!res) {
+            console.log('Unable to connect to lock');
             process.exit(2);
           }
         }
@@ -47,7 +47,7 @@ async function doStuff() {
             case LogOperate.ILLAGEL_UNLOCK:
             case LogOperate.DOOR_SENSOR_UNLOCK:
               // unlock event
-              console.log(">>>>>> Lock was unlocked <<<<<<");
+              console.log('>>>>>> Lock was unlocked <<<<<<');
               break;
             default:
             // not unlock event
@@ -55,15 +55,15 @@ async function doStuff() {
         }
         const status = await l.getLockStatus();
         if (status == LockedStatus.LOCKED) {
-          console.log(">>>>>> Lock is now locked <<<<<<");
+          console.log('>>>>>> Lock is now locked <<<<<<');
         } else if (status == LockedStatus.UNLOCKED) {
-          console.log(">>>>>> Lock is now unlocked <<<<<<");
+          console.log('>>>>>> Lock is now unlocked <<<<<<');
         }
       }
       if (p.lockedStatus) {
         const status = await l.getLockStatus();
         if (status == LockedStatus.LOCKED) {
-          console.log(">>>>>> Lock is now locked from new event <<<<<<");
+          console.log('>>>>>> Lock is now locked from new event <<<<<<');
         }
       }
 
@@ -71,16 +71,12 @@ async function doStuff() {
     });
 
     if (lock.isInitialized() && lock.isPaired()) {
-      lock.on("disconnected", () => {
-        // setTimeout(() => {
-        //   lock.connect();
-        // }, 3000);
-        // client.startScanLock();
-        console.log("Disconnected from a known lock");
+      lock.on('disconnected', () => {
+        console.log('Disconnected from a known lock');
         client.startMonitor();
       });
       await lock.connect();
-      console.log("Connected to a known lock");
+      console.log('Connected to a known lock');
       // make sure operation log is up to date
       await lock.getOperationLog();
       console.log();
@@ -89,8 +85,8 @@ async function doStuff() {
   });
 
   // save lock data changes
-  client.on("updatedLockData", async () => {
-    await require("./common/saveData")(settingsFile, client.getLockData());
+  client.on('updatedLockData', async () => {
+    await require('./common/saveData')(settingsFile, client.getLockData());
   });
 }
 

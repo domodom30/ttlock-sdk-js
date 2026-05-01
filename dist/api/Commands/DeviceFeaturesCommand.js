@@ -10,41 +10,40 @@ class DeviceFeaturesCommand extends Command_1.Command {
         if (this.commandData) {
             this.batteryCapacity = this.commandData.readInt8(0);
             this.special = this.commandData.readInt32BE(1);
-            console.log(this.commandData);
             const features = this.commandData.readUInt32BE(1);
             this.featureList = this.processFeatures(features);
         }
     }
     readFeatures(data) {
         if (data) {
-            let features = "";
-            let temp = "";
+            let features = '';
+            let temp = '';
             for (let i = 0; i < data.length; i++) {
                 temp += (0, digitUtil_1.padHexString)(data.readInt8(i).toString(16));
                 if (i % 4 == 3) {
                     features = temp + features;
-                    temp = "";
+                    temp = '';
                 }
             }
             let i = 0;
-            while (i < features.length && features.charAt(i) == "0") {
+            while (i < features.length && features.charAt(i) == '0') {
                 i++;
             }
             if (i == features.length) {
-                return "0";
+                return '0';
             }
             return features.substring(i).toUpperCase();
         }
         else {
-            return "";
+            return '';
         }
     }
     processFeatures(features) {
         let featureList = new Set();
         const featuresBinary = features.toString(2);
         Object.values(FeatureValue_1.FeatureValue).forEach((feature) => {
-            if (typeof feature != "string" && featuresBinary.length > feature) {
-                if (featuresBinary.charAt(featuresBinary.length - feature - 1) == "1") {
+            if (typeof feature != 'string' && featuresBinary.length > feature) {
+                if (featuresBinary.charAt(featuresBinary.length - feature - 1) == '1') {
                     featureList.add(feature);
                 }
             }

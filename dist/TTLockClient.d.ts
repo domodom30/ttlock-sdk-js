@@ -1,8 +1,8 @@
-import events from "events";
-import { TTLock } from "./device/TTLock";
-import { BluetoothLeService, ScannerType } from "./scanner/BluetoothLeService";
-import { ScannerOptions } from "./scanner/ScannerInterface";
-import { TTLockData } from "./store/TTLockData";
+import events from 'node:events';
+import { TTLock } from './device/TTLock';
+import { BluetoothLeService, ScannerType } from './scanner/BluetoothLeService';
+import { ScannerOptions } from './scanner/ScannerInterface';
+import { TTLockData } from './store/TTLockData';
 export interface Settings {
     uuids?: string[];
     scannerType?: ScannerType;
@@ -10,13 +10,13 @@ export interface Settings {
     lockData?: TTLockData[];
 }
 export interface TTLockClient {
-    on(event: "ready", listener: () => void): this;
-    on(event: "foundLock", listener: (lock: TTLock) => void): this;
-    on(event: "scanStart", listener: () => void): this;
-    on(event: "scanStop", listener: () => void): this;
-    on(event: "updatedLockData", listener: () => void): this;
-    on(event: "monitorStart", listener: () => void): this;
-    on(event: "monitorStop", listener: () => void): this;
+    on(event: 'ready', listener: () => void): this;
+    on(event: 'foundLock', listener: (lock: TTLock) => void): this;
+    on(event: 'scanStart', listener: () => void): this;
+    on(event: 'scanStop', listener: () => void): this;
+    on(event: 'updatedLockData', listener: () => void): this;
+    on(event: 'monitorStart', listener: () => void): this;
+    on(event: 'monitorStop', listener: () => void): this;
 }
 export declare class TTLockClient extends events.EventEmitter implements TTLockClient {
     bleService: BluetoothLeService | null;
@@ -25,7 +25,7 @@ export declare class TTLockClient extends events.EventEmitter implements TTLockC
     scannerOptions: ScannerOptions;
     lockData: Map<string, TTLockData>;
     private adapterReady;
-    private lockDevices;
+    private readonly lockDevices;
     private scanning;
     private monitoring;
     constructor(options: Settings);

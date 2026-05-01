@@ -22,7 +22,7 @@ export interface LogEntry {
 }
 
 export class OperationLogCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_GET_OPERATE_LOG;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_GET_OPERATE_LOG;
 
   private sequence?: number;
   private logs?: LogEntry[];
@@ -51,7 +51,7 @@ export class OperationLogCommand extends Command {
               this.commandData.readUInt8(index++).toString().padStart(2, '0'), // seconds
             electricQuantity: this.commandData.readUInt8(index++)
           };
-          let pwdLen: number = 0;
+          let pwdLen: number;
           switch (log.recordType) {
             case LogOperate.OPERATE_TYPE_MOBILE_UNLOCK:
             case LogOperate.OPERATE_BLE_LOCK:
@@ -63,7 +63,7 @@ export class OperationLogCommand extends Command {
               log.recordId = this.commandData.readUInt32BE(index);
               index += 4;
               if (log.recordType == LogOperate.REMOTE_CONTROL_KEY) {
-                log.keyId = this.commandData.readUInt8(index++);
+                log.keyId = this.commandData.readUInt8(index);
               }
               break;
 
@@ -81,17 +81,15 @@ export class OperationLogCommand extends Command {
             case LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED:
             case LogOperate.ADD_ADMIN_BY_KEYBOARD:
               pwdLen = this.commandData.readUInt8(index++);
-              log.password = this.commandData.slice(index, index + pwdLen).toString('ascii');
+              log.password = this.commandData.subarray(index, index + pwdLen).toString('ascii');
               index += pwdLen;
               pwdLen = this.commandData.readUInt8(index++);
-              log.newPassword = this.commandData.slice(index, index + pwdLen).toString('ascii');
-              index += pwdLen;
+              log.newPassword = this.commandData.subarray(index, index + pwdLen).toString('ascii');
               break;
 
             case LogOperate.OPERATE_TYPE_ERROR_PASSWORD_UNLOCK:
               pwdLen = this.commandData.readUInt8(index++);
-              log.password = this.commandData.slice(index, index + pwdLen).toString('ascii');
-              index += pwdLen;
+              log.password = this.commandData.subarray(index, index + pwdLen).toString('ascii');
               break;
 
             case LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS:
@@ -101,7 +99,7 @@ export class OperationLogCommand extends Command {
                 this.commandData.readUInt8(index++).toString().padStart(2, '0') + // month
                 this.commandData.readUInt8(index++).toString().padStart(2, '0') + // day
                 this.commandData.readUInt8(index++).toString().padStart(2, '0') + // hour
-                this.commandData.readUInt8(index++).toString().padStart(2, '0'); // minutes
+                this.commandData.readUInt8(index).toString().padStart(2, '0'); // minutes
               break;
 
             case LogOperate.OPERATE_TYPE_ADD_IC:
@@ -116,7 +114,6 @@ export class OperationLogCommand extends Command {
               } else {
                 log.password = this.commandData.readBigUInt64BE(index).toString();
               }
-              index += pwdLen;
               break;
 
             case LogOperate.OPERATE_TYPE_BONG_UNLOCK_SUCCEED:
@@ -132,7 +129,6 @@ export class OperationLogCommand extends Command {
                 this.commandData.readUInt8(index + 1).toString(16) +
                 ':' +
                 this.commandData.readUInt8(index).toString(16);
-              index += 6;
               break;
 
             case LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED:
@@ -141,14 +137,13 @@ export class OperationLogCommand extends Command {
             case LogOperate.OPERATE_TYPE_DELETE_FR_SUCCEED:
             case LogOperate.FR_LOCK:
             case LogOperate.FR_UNLOCK_FAILED_LOCK_REVERSE:
-              log.password = Buffer.concat([Buffer.from([0, 0]), this.commandData.slice(index, index + 6)])
+              log.password = Buffer.concat([Buffer.from([0, 0]), this.commandData.subarray(index, index + 6)])
                 .readBigInt64BE()
                 .toString();
               index += 6;
               if (index < recStart + recLen) {
                 pwdLen = recLen - (index - recStart); // what's left
-                log.newPassword = this.commandData.slice(index, index + pwdLen).toString('ascii');
-                index += pwdLen;
+                log.newPassword = this.commandData.subarray(index, index + pwdLen).toString('ascii');
               }
               break;
 
@@ -168,7 +163,7 @@ export class OperationLogCommand extends Command {
                 this.commandData.readUInt8(index).toString(16);
               index += 6;
               log.keyId = this.commandData.readUInt8(index++);
-              log.accessoryElectricQuantity = this.commandData.readUInt8(index++);
+              log.accessoryElectricQuantity = this.commandData.readUInt8(index);
               break;
 
             case LogOperate.TAMPER_ALARM:
@@ -184,7 +179,7 @@ export class OperationLogCommand extends Command {
             default:
               pwdLen = recLen - (index - recStart);
               if (pwdLen > 0) {
-                logger.warn('LogOperate not implemented:', log.recordType, 'data left:', this.commandData.slice(index, index + pwdLen).toString('hex'));
+                logger.warn('LogOperate not implemented:', log.recordType, 'data left:', this.commandData.subarray(index, index + pwdLen).toString('hex'));
               }
           }
 
@@ -200,9 +195,7 @@ export class OperationLogCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.sequence == 'undefined') {
-      this.sequence = 0xffff;
-    }
+    this.sequence ??= 0xffff;
     let data = Buffer.alloc(2);
     data.writeUInt16BE(this.sequence);
     return data;
@@ -213,7 +206,7 @@ export class OperationLogCommand extends Command {
   }
 
   getSequence(): number {
-    if (typeof this.sequence == 'undefined') {
+    if (this.sequence == undefined) {
       return 0xffff;
     } else {
       return this.sequence;
@@ -221,7 +214,7 @@ export class OperationLogCommand extends Command {
   }
 
   getLogs(): LogEntry[] {
-    if (typeof this.logs == 'undefined') {
+    if (this.logs == undefined) {
       return [];
     } else {
       return this.logs;

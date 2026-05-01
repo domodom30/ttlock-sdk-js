@@ -669,7 +669,7 @@ class TTLock extends TTLockApi_1.TTLockApi {
             throw new Error('Lock is in pairing mode');
         }
         if (!this.hasPassCode()) {
-            throw new Error('No PassCode support');
+            log.warn('Lock does not report PassCode support, trying anyway');
         }
         if (!this.isConnected()) {
             throw new Error('Lock is not connected');
@@ -703,7 +703,7 @@ class TTLock extends TTLockApi_1.TTLockApi {
             throw new Error('Lock is in pairing mode');
         }
         if (!this.hasPassCode()) {
-            throw new Error('No PassCode support');
+            log.warn('Lock does not report PassCode support, trying anyway');
         }
         if (!this.isConnected()) {
             throw new Error('Lock is not connected');
@@ -734,7 +734,7 @@ class TTLock extends TTLockApi_1.TTLockApi {
             throw new Error('Lock is in pairing mode');
         }
         if (!this.hasPassCode()) {
-            throw new Error('No PassCode support');
+            log.warn('Lock does not report PassCode support, trying anyway');
         }
         if (!this.isConnected()) {
             throw new Error('Lock is not connected');
@@ -763,7 +763,7 @@ class TTLock extends TTLockApi_1.TTLockApi {
             throw new Error('Lock is in pairing mode');
         }
         if (!this.hasPassCode()) {
-            throw new Error('No PassCode support');
+            log.warn('Lock does not report PassCode support, trying anyway');
         }
         if (!this.isConnected()) {
             throw new Error('Lock is not connected');
@@ -792,7 +792,7 @@ class TTLock extends TTLockApi_1.TTLockApi {
             throw new Error('Lock is in pairing mode');
         }
         if (!this.hasPassCode()) {
-            throw new Error('No PassCode support');
+            log.warn('Lock does not report PassCode support, trying anyway');
         }
         if (!this.isConnected()) {
             throw new Error('Lock is not connected');
@@ -968,6 +968,9 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     });
                 } while (sequence != -1);
             }
+            else {
+                log.error('getICCards: admin login failed, cannot retrieve IC cards');
+            }
         }
         catch (error) {
             log.error('Error while getting IC Cards', error);
@@ -1118,6 +1121,9 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     });
                 } while (sequence != -1);
             }
+            else {
+                log.error('getFingerprints: admin login failed, cannot retrieve fingerprints');
+            }
         }
         catch (error) {
             log.error('Error while getting Fingerprints', error);
@@ -1166,6 +1172,11 @@ class TTLock extends TTLockApi_1.TTLockApi {
         if (!this.isConnected()) {
             log('getOperationLog: lock is not connected');
             return [];
+        }
+        // Admin authentication is required for all BLE log commands
+        if (!(await this.macro_adminLogin())) {
+            log.error('getOperationLog: admin login failed, returning cached data');
+            return this.operationLog.filter(Boolean);
         }
         let newOperations = [];
         // in all mode do the following
@@ -1277,8 +1288,14 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     } while (!success && retry < maxRetry);
                 }
             }
-            this.operationLog = operations;
-            this.emit('dataUpdated', this);
+            // Only update the cached log if we actually got data — never overwrite with empty
+            if (operations.length > 0) {
+                this.operationLog = operations;
+                this.emit('dataUpdated', this);
+            }
+            else {
+                log.warn('getOperationLog: BLE fetch returned no records, keeping existing cache');
+            }
             return this.operationLog;
         }
         else {

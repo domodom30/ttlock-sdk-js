@@ -1437,25 +1437,30 @@ export abstract class TTLockApi extends EventEmitter {
     return deviceInfo;
   }
 
-  protected async macro_adminLogin(): Promise<boolean> {
+  protected async macro_adminLogin(maxRetries: number = 3, retryDelayMs: number = 600): Promise<boolean> {
     if (this.adminAuth) {
       return true;
     }
-    try {
-      log('========= check admin');
-      const psFromLock = await this.checkAdminCommand();
-      log('========= check admin:', psFromLock);
-      if (psFromLock > 0) {
-        log('========= check random');
-        await this.checkRandomCommand(psFromLock);
-        log('========= check random');
-        this.adminAuth = true;
-        return true;
-      } else {
-        log.error('Invalid psFromLock received', psFromLock);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        log(`========= check admin (attempt ${attempt}/${maxRetries})`);
+        const psFromLock = await this.checkAdminCommand();
+        log('========= check admin:', psFromLock);
+        if (psFromLock > 0) {
+          log('========= check random');
+          await this.checkRandomCommand(psFromLock);
+          log('========= check random OK');
+          this.adminAuth = true;
+          return true;
+        } else {
+          log.error('Invalid psFromLock received', psFromLock);
+        }
+      } catch (error) {
+        log.error(`macro_adminLogin attempt ${attempt}/${maxRetries}:`, error);
       }
-    } catch (error) {
-      log.error('macro_adminLogin:', error);
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
     }
     return false;
   }

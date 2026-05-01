@@ -1,14 +1,14 @@
 'use strict';
 
-import events from "events";
-import { LockType } from "./constant/Lock";
-import { TTBluetoothDevice } from "./device/TTBluetoothDevice";
-import { TTLock } from "./device/TTLock";
+import events from 'node:events';
+import { LockType } from './constant/Lock';
+import { TTBluetoothDevice } from './device/TTBluetoothDevice';
+import { TTLock } from './device/TTLock';
 
-import { BluetoothLeService, TTLockUUIDs, ScannerType } from "./scanner/BluetoothLeService";
-import { ScannerOptions } from "./scanner/ScannerInterface";
-import { TTLockData } from "./store/TTLockData";
-import { sleep } from "./util/timingUtil";
+import { BluetoothLeService, TTLockUUIDs, ScannerType } from './scanner/BluetoothLeService';
+import { ScannerOptions } from './scanner/ScannerInterface';
+import { TTLockData } from './store/TTLockData';
+import { sleep } from './util/timingUtil';
 
 export interface Settings {
   uuids?: string[];
@@ -18,23 +18,23 @@ export interface Settings {
 }
 
 export interface TTLockClient {
-  on(event: "ready", listener: () => void): this;
-  on(event: "foundLock", listener: (lock: TTLock) => void): this;
-  on(event: "scanStart", listener: () => void): this;
-  on(event: "scanStop", listener: () => void): this;
-  on(event: "updatedLockData", listener: () => void): this;
-  on(event: "monitorStart", listener: () => void): this;
-  on(event: "monitorStop", listener: () => void): this;
+  on(event: 'ready', listener: () => void): this;
+  on(event: 'foundLock', listener: (lock: TTLock) => void): this;
+  on(event: 'scanStart', listener: () => void): this;
+  on(event: 'scanStop', listener: () => void): this;
+  on(event: 'updatedLockData', listener: () => void): this;
+  on(event: 'monitorStart', listener: () => void): this;
+  on(event: 'monitorStop', listener: () => void): this;
 }
 
 export class TTLockClient extends events.EventEmitter implements TTLockClient {
   bleService: BluetoothLeService | null = null;
   uuids: string[];
-  scannerType: ScannerType = "noble";
+  scannerType: ScannerType = 'noble';
   scannerOptions: ScannerOptions;
   lockData: Map<string, TTLockData>;
   private adapterReady: boolean;
-  private lockDevices: Map<string, TTLock> = new Map();
+  private readonly lockDevices: Map<string, TTLock> = new Map();
   private scanning: boolean = false;
   private monitoring: boolean = false;
 
@@ -49,14 +49,14 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
       this.uuids = TTLockUUIDs;
     }
 
-    if (typeof options.scannerType != "undefined") {
+    if (options.scannerType != undefined) {
       this.scannerType = options.scannerType;
     }
 
-    if (typeof options.scannerOptions != "undefined") {
-      this.scannerOptions = options.scannerOptions;
-    } else {
+    if (options.scannerOptions == undefined) {
       this.scannerOptions = {};
+    } else {
+      this.scannerOptions = options.scannerOptions;
     }
 
     this.lockData = new Map();
@@ -68,10 +68,13 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   async prepareBTService(): Promise<boolean> {
     if (this.bleService == null) {
       this.bleService = new BluetoothLeService(this.uuids, this.scannerType, this.scannerOptions);
-      this.bleService.on("ready", () => { this.adapterReady = true; this.emit("ready") });
-      this.bleService.on("scanStart", this.onScanStart.bind(this));
-      this.bleService.on("scanStop", this.onScanStop.bind(this));
-      this.bleService.on("discover", this.onScanResult.bind(this));
+      this.bleService.on('ready', () => {
+        this.adapterReady = true;
+        this.emit('ready');
+      });
+      this.bleService.on('scanStart', this.onScanStart.bind(this));
+      this.bleService.on('scanStop', this.onScanStop.bind(this));
+      this.bleService.on('discover', this.onScanResult.bind(this));
       // wait for adapter to become ready
       let counter = 5;
       do {
@@ -125,14 +128,14 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   isScanning(): boolean {
     if (this.bleService) {
-      return (this.bleService.isScanning() && this.scanning);
+      return this.bleService.isScanning() && this.scanning;
     }
     return false;
   }
 
   isMonitoring(): boolean {
     if (this.bleService) {
-      return (this.bleService.isScanning() && this.monitoring);
+      return this.bleService.isScanning() && this.monitoring;
     }
     return false;
   }
@@ -151,7 +154,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
       newLockData.forEach((lockData) => {
         this.lockData.set(lockData.address, lockData);
         const lock = this.lockDevices.get(lockData.address);
-        if (typeof lock != "undefined") {
+        if (lock != undefined) {
           lock.updateLockData(lockData);
         }
       });
@@ -160,18 +163,18 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   private onScanStart(): void {
     if (this.scanning) {
-      this.emit("scanStart");
+      this.emit('scanStart');
     } else if (this.monitoring) {
-      this.emit("monitorStart");
+      this.emit('monitorStart');
     }
   }
 
   private onScanStop(): void {
     if (this.scanning) {
-      this.emit("scanStop");
+      this.emit('scanStop');
       this.scanning = false;
     } else if (this.monitoring) {
-      this.emit("monitorStop");
+      this.emit('monitorStop');
       this.monitoring = false;
     }
   }
@@ -179,28 +182,26 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   private onScanResult(device: TTBluetoothDevice): void {
     // Is it a Lock device ?
     if (device.lockType != LockType.UNKNOWN) {
-
       if (!this.lockDevices.has(device.address)) {
         const data = this.lockData.get(device.address);
         const lock = new TTLock(device, data);
         this.lockDevices.set(device.address, lock);
-        lock.on("dataUpdated", (lock) => {
+        lock.on('dataUpdated', (lock) => {
           const lockData = lock.getLockData();
-          if (typeof lockData != "undefined") {
+          if (lockData != undefined) {
             this.lockData.set(lockData.address, lockData);
-            this.emit("updatedLockData");
+            this.emit('updatedLockData');
           }
         });
-        lock.on("lockReset", (address, id) => {
+        lock.on('lockReset', (address, id) => {
           this.lockData.delete(address);
           this.lockDevices.delete(address);
           this.bleService?.forgetDevice(id);
-          this.emit("updatedLockData");
+          this.emit('updatedLockData');
         });
 
-        this.emit("foundLock", lock);
+        this.emit('foundLock', lock);
       }
-
     }
   }
 }

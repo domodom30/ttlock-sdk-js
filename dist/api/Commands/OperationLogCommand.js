@@ -30,7 +30,7 @@ class OperationLogCommand extends Command_1.Command {
                             this.commandData.readUInt8(index++).toString().padStart(2, '0'), // seconds
                         electricQuantity: this.commandData.readUInt8(index++)
                     };
-                    let pwdLen = 0;
+                    let pwdLen;
                     switch (log.recordType) {
                         case LogOperate_1.LogOperate.OPERATE_TYPE_MOBILE_UNLOCK:
                         case LogOperate_1.LogOperate.OPERATE_BLE_LOCK:
@@ -42,7 +42,7 @@ class OperationLogCommand extends Command_1.Command {
                             log.recordId = this.commandData.readUInt32BE(index);
                             index += 4;
                             if (log.recordType == LogOperate_1.LogOperate.REMOTE_CONTROL_KEY) {
-                                log.keyId = this.commandData.readUInt8(index++);
+                                log.keyId = this.commandData.readUInt8(index);
                             }
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK:
@@ -57,16 +57,14 @@ class OperationLogCommand extends Command_1.Command {
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED:
                         case LogOperate_1.LogOperate.ADD_ADMIN_BY_KEYBOARD:
                             pwdLen = this.commandData.readUInt8(index++);
-                            log.password = this.commandData.slice(index, index + pwdLen).toString('ascii');
+                            log.password = this.commandData.subarray(index, index + pwdLen).toString('ascii');
                             index += pwdLen;
                             pwdLen = this.commandData.readUInt8(index++);
-                            log.newPassword = this.commandData.slice(index, index + pwdLen).toString('ascii');
-                            index += pwdLen;
+                            log.newPassword = this.commandData.subarray(index, index + pwdLen).toString('ascii');
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_ERROR_PASSWORD_UNLOCK:
                             pwdLen = this.commandData.readUInt8(index++);
-                            log.password = this.commandData.slice(index, index + pwdLen).toString('ascii');
-                            index += pwdLen;
+                            log.password = this.commandData.subarray(index, index + pwdLen).toString('ascii');
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS:
                             log.deleteDate =
@@ -75,7 +73,7 @@ class OperationLogCommand extends Command_1.Command {
                                     this.commandData.readUInt8(index++).toString().padStart(2, '0') + // month
                                     this.commandData.readUInt8(index++).toString().padStart(2, '0') + // day
                                     this.commandData.readUInt8(index++).toString().padStart(2, '0') + // hour
-                                    this.commandData.readUInt8(index++).toString().padStart(2, '0'); // minutes
+                                    this.commandData.readUInt8(index).toString().padStart(2, '0'); // minutes
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_ADD_IC:
                         case LogOperate_1.LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED:
@@ -90,7 +88,6 @@ class OperationLogCommand extends Command_1.Command {
                             else {
                                 log.password = this.commandData.readBigUInt64BE(index).toString();
                             }
-                            index += pwdLen;
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_BONG_UNLOCK_SUCCEED:
                             log.password =
@@ -105,7 +102,6 @@ class OperationLogCommand extends Command_1.Command {
                                     this.commandData.readUInt8(index + 1).toString(16) +
                                     ':' +
                                     this.commandData.readUInt8(index).toString(16);
-                            index += 6;
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED:
                         case LogOperate_1.LogOperate.OPERATE_TYPE_ADD_FR:
@@ -113,14 +109,13 @@ class OperationLogCommand extends Command_1.Command {
                         case LogOperate_1.LogOperate.OPERATE_TYPE_DELETE_FR_SUCCEED:
                         case LogOperate_1.LogOperate.FR_LOCK:
                         case LogOperate_1.LogOperate.FR_UNLOCK_FAILED_LOCK_REVERSE:
-                            log.password = Buffer.concat([Buffer.from([0, 0]), this.commandData.slice(index, index + 6)])
+                            log.password = Buffer.concat([Buffer.from([0, 0]), this.commandData.subarray(index, index + 6)])
                                 .readBigInt64BE()
                                 .toString();
                             index += 6;
                             if (index < recStart + recLen) {
                                 pwdLen = recLen - (index - recStart); // what's left
-                                log.newPassword = this.commandData.slice(index, index + pwdLen).toString('ascii');
-                                index += pwdLen;
+                                log.newPassword = this.commandData.subarray(index, index + pwdLen).toString('ascii');
                             }
                             break;
                         case LogOperate_1.LogOperate.WIRELESS_KEY_FOB:
@@ -139,7 +134,7 @@ class OperationLogCommand extends Command_1.Command {
                                     this.commandData.readUInt8(index).toString(16);
                             index += 6;
                             log.keyId = this.commandData.readUInt8(index++);
-                            log.accessoryElectricQuantity = this.commandData.readUInt8(index++);
+                            log.accessoryElectricQuantity = this.commandData.readUInt8(index);
                             break;
                         case LogOperate_1.LogOperate.TAMPER_ALARM:
                         case LogOperate_1.LogOperate.LOW_BATTERY_ALARM:
@@ -153,7 +148,7 @@ class OperationLogCommand extends Command_1.Command {
                         default:
                             pwdLen = recLen - (index - recStart);
                             if (pwdLen > 0) {
-                                logger.warn('LogOperate not implemented:', log.recordType, 'data left:', this.commandData.slice(index, index + pwdLen).toString('hex'));
+                                logger.warn('LogOperate not implemented:', log.recordType, 'data left:', this.commandData.subarray(index, index + pwdLen).toString('hex'));
                             }
                     }
                     // Always advance to the exact end of this record, regardless of how
@@ -166,9 +161,8 @@ class OperationLogCommand extends Command_1.Command {
         }
     }
     build() {
-        if (typeof this.sequence == 'undefined') {
-            this.sequence = 0xffff;
-        }
+        var _a;
+        (_a = this.sequence) !== null && _a !== void 0 ? _a : (this.sequence = 0xffff);
         let data = Buffer.alloc(2);
         data.writeUInt16BE(this.sequence);
         return data;
@@ -177,7 +171,7 @@ class OperationLogCommand extends Command_1.Command {
         this.sequence = sequence;
     }
     getSequence() {
-        if (typeof this.sequence == 'undefined') {
+        if (this.sequence == undefined) {
             return 0xffff;
         }
         else {
@@ -185,7 +179,7 @@ class OperationLogCommand extends Command_1.Command {
         }
     }
     getLogs() {
-        if (typeof this.logs == 'undefined') {
+        if (this.logs == undefined) {
             return [];
         }
         else {
