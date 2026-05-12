@@ -17,7 +17,7 @@ import { TTLockData, TTLockPrivateData } from '../store/TTLockData';
 import { sleep } from '../util/timingUtil';
 import { createLogger } from '../util/logger';
 import { TTBluetoothDevice } from './TTBluetoothDevice';
-import { LockParamsChanged, TTLockApi } from './TTLockApi';
+import { LockParamsChanged, NoMoreOperationDataError, PasscodeOperationError, TTLockApi } from './TTLockApi';
 
 const log = createLogger('ttlock:api');
 
@@ -42,6 +42,11 @@ export class TTLock extends TTLockApi implements TTLock {
   private connected: boolean;
   private skipDataRead: boolean = false;
   private connecting: boolean = false;
+
+  // Detail of the most recent passcode-operation rejection by the firmware.
+  // Reset at the start of each addPassCode/updatePassCode/deletePassCode/clearPassCodes/getPassCodes call.
+  // Callers can read this after the method returns false/empty to know *why* the lock refused.
+  public lastPasscodeError: PasscodeOperationError | null = null;
 
   constructor(device: TTBluetoothDevice, data?: TTLockData) {
     super(device, data);
@@ -382,6 +387,35 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   /**
+   * Obtient un psFromLock valide pour une opération lock/unlock.
+   * Essaie d'abord la voie "user" (checkUserTime). Si la serrure la rejette
+   * (pas d'utilisateur enregistré, serrure type room-lock, etc.), bascule
+   * automatiquement sur la voie "admin" (checkAdmin seul — le challenge est
+   * ensuite consommé directement par unlockCommand/lockCommand via setSum).
+   */
+  private async getPsFromLock(): Promise<number> {
+    try {
+      log('========= check user time');
+      const ps = await this.checkUserTime();
+      log('========= check user time OK', ps);
+      return ps;
+    } catch (userErr) {
+      log('========= check user time failed, falling back to admin path:', userErr);
+      // Voie admin : checkAdmin uniquement — le psFromLock est ensuite passé
+      // à unlockCommand/lockCommand qui envoie setSum(ps, unlockKey).
+      // Ne PAS appeler checkRandom ici : il consommerait le challenge et la
+      // commande unlock suivante serait rejetée par la serrure.
+      log('========= check admin (admin path)');
+      const ps = await this.checkAdminCommand();
+      log('========= check admin OK:', ps);
+      if (ps <= 0) {
+        throw new Error(`Invalid psFromLock from checkAdmin: ${ps}`);
+      }
+      return ps;
+    }
+  }
+
+  /**
    * Lock the lock
    */
   async lock(): Promise<boolean> {
@@ -394,9 +428,7 @@ export class TTLock extends TTLockApi implements TTLock {
     }
 
     try {
-      log('========= check user time');
-      const psFromLock = await this.checkUserTime();
-      log('========= check user time', psFromLock);
+      const psFromLock = await this.getPsFromLock();
       log('========= lock');
       const lockData = await this.lockCommand(psFromLock);
       log('========= lock', lockData);
@@ -423,9 +455,7 @@ export class TTLock extends TTLockApi implements TTLock {
     }
 
     try {
-      log('========= check user time');
-      const psFromLock = await this.checkUserTime();
-      log('========= check user time', psFromLock);
+      const psFromLock = await this.getPsFromLock();
       log('========= unlock');
       const unlockData = await this.unlockCommand(psFromLock);
       log('========= unlock', unlockData);
@@ -681,6 +711,78 @@ export class TTLock extends TTLockApi implements TTLock {
     return true;
   }
 
+  /**
+   * Re-synchronise le passcode admin du clavier physique de la serrure avec
+   * une valeur connue côté SDK. Ne touche pas au pairing BLE ni à `lockData.json`.
+   *
+   * Utile lorsque l'admin clavier a été modifié via la serrure (events
+   * recordType 92/93) et que le firmware bloque certaines opérations BLE
+   * (typiquement ajout de passcodes utilisateur → 0x14).
+   *
+   * @param passcode 4-9 chiffres. Si omis, un code aléatoire à 7 chiffres est généré.
+   * @returns Le passcode admin clavier effectivement défini, ou false en cas d'échec.
+   */
+  async syncAdminKeyboardPasscode(passcode?: string): Promise<string | false> {
+    if (!this.isConnected()) {
+      throw new Error('Lock is not connected');
+    }
+
+    if (!this.initialized) {
+      throw new Error('Lock is in pairing mode');
+    }
+
+    try {
+      if (await this.macro_adminLogin()) {
+        log('========= sync admin keyboard passcode');
+        const result = await this.setAdminKeyboardPwdCommand(passcode);
+        log('========= sync admin keyboard passcode', result);
+        return result;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      log.error('Error while syncing admin keyboard passcode', error);
+      return false;
+    }
+  }
+
+  /**
+   * Programme un "erase passcode" : un code à 4-9 chiffres qui, tapé sur le clavier physique,
+   * déclenche un reset usine de la serrure. Utile en dernier recours quand le module clavier est
+   * verrouillé par le firmware (code 0x14) et que les commandes admin-write classiques sont
+   * rejetées — cette commande utilise COMM_SET_DELETE_PWD (0x44), un canal distinct.
+   *
+   * @param erasePasscode 4-9 chiffres
+   * @returns Le passcode défini, ou false en cas d'échec.
+   */
+  async setErasePasscode(erasePasscode: string): Promise<string | false> {
+    if (!this.isConnected()) {
+      throw new Error('Lock is not connected');
+    }
+
+    if (!this.initialized) {
+      throw new Error('Lock is in pairing mode');
+    }
+
+    if (!/^\d{4,9}$/.test(erasePasscode)) {
+      throw new Error('erasePasscode must be 4 to 9 digits');
+    }
+
+    try {
+      if (await this.macro_adminLogin()) {
+        log('========= set erase passcode');
+        const result = await this.setEraseKeyboardPwdCommand(erasePasscode);
+        log('========= set erase passcode', result);
+        return result;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      log.error('Error while setting erase passcode', error);
+      return false;
+    }
+  }
+
   async getPassageMode(): Promise<PassageModeData[]> {
     if (!this.isConnected()) {
       throw new Error('Lock is not connected');
@@ -805,6 +907,7 @@ export class TTLock extends TTLockApi implements TTLock {
       throw new Error('Lock is not connected');
     }
 
+    this.lastPasscodeError = null;
     try {
       if (await this.macro_adminLogin()) {
         log('========= add passCode');
@@ -815,7 +918,48 @@ export class TTLock extends TTLockApi implements TTLock {
         return false;
       }
     } catch (error) {
+      if (error instanceof PasscodeOperationError) {
+        this.lastPasscodeError = error;
+      }
       log.error('Error while adding passcode', error);
+      return false;
+    }
+  }
+
+  /**
+   * Recover a passcode that was previously known to the lock (uses PwdOperateType.RECOVERY=6).
+   * Useful when the firmware passcode index is corrupted but the lock still has the slot reserved —
+   * recover may succeed where add returns 0x14 (keyboard module lockdown).
+   *
+   * @param type PassCode type: 1 - permanent, 2 - one time, 3 - limited time
+   * @param passCode 4-9 digits code
+   * @param startDate Valid from YYYYMMDDHHmm
+   * @param endDate Valid to YYYYMMDDHHmm
+   */
+  async recoverPassCode(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string): Promise<boolean> {
+    if (!this.initialized) {
+      throw new Error('Lock is in pairing mode');
+    }
+
+    if (!this.isConnected()) {
+      throw new Error('Lock is not connected');
+    }
+
+    this.lastPasscodeError = null;
+    try {
+      if (await this.macro_adminLogin()) {
+        log('========= recover passCode');
+        const result = await this.recoverCustomPasscodeCommand(type, passCode, startDate, endDate);
+        log('========= recover passCode', result);
+        return result;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      if (error instanceof PasscodeOperationError) {
+        this.lastPasscodeError = error;
+      }
+      log.error('Error while recovering passcode', error);
       return false;
     }
   }
@@ -841,6 +985,7 @@ export class TTLock extends TTLockApi implements TTLock {
       throw new Error('Lock is not connected');
     }
 
+    this.lastPasscodeError = null;
     try {
       if (await this.macro_adminLogin()) {
         log('========= update passCode');
@@ -851,6 +996,9 @@ export class TTLock extends TTLockApi implements TTLock {
         return false;
       }
     } catch (error) {
+      if (error instanceof PasscodeOperationError) {
+        this.lastPasscodeError = error;
+      }
       log.error('Error while updating passcode', error);
       return false;
     }
@@ -874,6 +1022,7 @@ export class TTLock extends TTLockApi implements TTLock {
       throw new Error('Lock is not connected');
     }
 
+    this.lastPasscodeError = null;
     try {
       if (await this.macro_adminLogin()) {
         log('========= delete passCode');
@@ -884,6 +1033,9 @@ export class TTLock extends TTLockApi implements TTLock {
         return false;
       }
     } catch (error) {
+      if (error instanceof PasscodeOperationError) {
+        this.lastPasscodeError = error;
+      }
       log.error('Error while deleting passcode', error);
       return false;
     }
@@ -905,6 +1057,7 @@ export class TTLock extends TTLockApi implements TTLock {
       throw new Error('Lock is not connected');
     }
 
+    this.lastPasscodeError = null;
     try {
       if (await this.macro_adminLogin()) {
         log('========= clear passCodes');
@@ -915,6 +1068,9 @@ export class TTLock extends TTLockApi implements TTLock {
         return false;
       }
     } catch (error) {
+      if (error instanceof PasscodeOperationError) {
+        this.lastPasscodeError = error;
+      }
       log.error('Error while clearing passcodes', error);
       return false;
     }
@@ -938,6 +1094,7 @@ export class TTLock extends TTLockApi implements TTLock {
 
     let data: KeyboardPassCode[] = [];
 
+    this.lastPasscodeError = null;
     try {
       if (await this.macro_adminLogin()) {
         let sequence = 0;
@@ -952,6 +1109,9 @@ export class TTLock extends TTLockApi implements TTLock {
         } while (sequence != -1);
       }
     } catch (error) {
+      if (error instanceof PasscodeOperationError) {
+        this.lastPasscodeError = error;
+      }
       log.error('Error while getting passCodes', error);
     }
 
@@ -1358,18 +1518,16 @@ export class TTLock extends TTLockApi implements TTLock {
 
   async getOperationLog(all: boolean = false, noCache: boolean = false): Promise<LogEntry[]> {
     if (!this.initialized) {
-      log('getOperationLog: lock is in pairing mode');
       return [];
     }
 
     if (!this.isConnected()) {
-      log('getOperationLog: lock is not connected');
       return [];
     }
 
     // Admin authentication is required for all BLE log commands
-    if (!(await this.macro_adminLogin())) {
-      log.error('getOperationLog: admin login failed, returning cached data');
+    const adminOk = await this.macro_adminLogin();
+    if (!adminOk) {
       return this.operationLog.filter(Boolean) as LogEntry[];
     }
 
@@ -1383,23 +1541,30 @@ export class TTLock extends TTLockApi implements TTLock {
 
     const maxRetry = 3;
 
-    // first, always get new operations
-    if (this.hasNewEvents()) {
+    // first, always get new operations (force with sequence=0xffff even if hasNewEvents is false)
+    {
       let sequence = 0xffff;
       let retry = 0;
       do {
         log('========= get OperationLog', sequence);
         try {
+          if (!this.isConnected()) {
+            break;
+          }
           const response = await this.getOperationLogCommand(sequence);
           sequence = response.sequence;
-          for (let log of response.data) {
-            if (log) {
-              newOperations.push(log);
-              this.operationLog[log.recordNumber] = log;
+          for (let entry of response.data) {
+            if (entry) {
+              newOperations.push(entry);
+              this.operationLog[entry.recordNumber] = entry;
             }
           }
           retry = 0;
-        } catch (error) {
+        } catch (error: any) {
+          // Firmware sentinel "no more data" — exit the loop without burning retries
+          if (error instanceof NoMoreOperationDataError) {
+            break;
+          }
           retry++;
         }
       } while (sequence > 0 && retry < maxRetry);
@@ -1435,27 +1600,49 @@ export class TTLock extends TTLockApi implements TTLock {
         let sequence = 0;
         let failedSequences = 0;
         let retry = 0;
+        let keepGoing = true;
         do {
           log('========= get OperationLog', sequence);
           try {
             const response = await this.getOperationLogCommand(sequence);
-            sequence = response.sequence;
-            log('========= get OperationLog next seq', sequence);
-            for (let log of response.data) {
-              operations[log.recordNumber] = log;
+            const nextSeq = response.sequence;
+            log('========= get OperationLog next seq', nextSeq);
+            for (let entry of response.data) {
+              operations[entry.recordNumber] = entry;
             }
             retry = 0;
+            failedSequences = 0; // reset on success
+            if (nextSeq <= 0) {
+              keepGoing = false;
+            } else {
+              sequence = nextSeq;
+            }
           } catch (error) {
+            // Sentinel: skip this sequence immediately without retrying
+            if (error instanceof NoMoreOperationDataError) {
+              log('========= get OperationLog skip seq (sentinel)', sequence);
+              sequence++;
+              failedSequences++;
+              retry = 0;
+              // Stop after too many consecutive missing sequences
+              if (failedSequences > 10) {
+                keepGoing = false;
+              }
+              continue;
+            }
             retry++;
             // some operations just can't be read
-            if (retry == maxRetry) {
+            if (retry >= maxRetry) {
               log('========= get OperationLog skip seq', sequence);
               sequence++;
               failedSequences++;
               retry = 0;
+              if (failedSequences > 10) {
+                keepGoing = false;
+              }
             }
           }
-        } while (sequence > 0 && retry < maxRetry);
+        } while (keepGoing && retry < maxRetry);
       } else {
         // if we have operations, check for missing
         let missing = [];
@@ -1477,6 +1664,10 @@ export class TTLock extends TTLockApi implements TTLock {
               retry = 0;
               success = true;
             } catch (error) {
+              // Sentinel: this record genuinely doesn't exist on the lock — give up on it
+              if (error instanceof NoMoreOperationDataError) {
+                break;
+              }
               retry++;
             }
           } while (!success && retry < maxRetry);

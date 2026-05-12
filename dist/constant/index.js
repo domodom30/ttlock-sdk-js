@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LogOperateCategory = exports.LogOperateNames = exports.PwdOperateType = exports.PassageModeType = exports.PassageModeOperate = exports.OperationType = exports.LogType = exports.LogOperate = exports.LockSoundVolume = exports.LockedStatus = exports.LockVersion = exports.LockType = exports.KeyboardPwdType = exports.ICOperate = exports.FeatureValue = exports.DeviceInfoEnum = exports.DateConstant = exports.CyclicUserType = exports.CyclicType = exports.CyclicOpType = exports.ControlAction = exports.ConfigRemoteUnlock = exports.CommandType = exports.CommandResponse = exports.CallbackOperationType = exports.AutoLockOperate = exports.AudioManage = exports.ActionType = exports.APICommand = void 0;
+exports.LogOperateCategory = exports.LogOperateNames = exports.PwdOperateType = exports.PassageModeType = exports.PassageModeOperate = exports.OperationType = exports.LogType = exports.LogOperate = exports.LockSoundVolume = exports.LockedStatus = exports.LockVersion = exports.LockType = exports.KeyboardPwdType = exports.ICOperate = exports.FeatureValue = exports.DeviceInfoEnum = exports.DateConstant = exports.CyclicUserType = exports.CyclicType = exports.CyclicOpType = exports.ControlAction = exports.ConfigRemoteUnlock = exports.CommandType = exports.describeFirmwareError = exports.FirmwareErrorDescriptions = exports.FirmwareErrorCode = exports.CommandResponse = exports.CallbackOperationType = exports.AutoLockOperate = exports.AudioManage = exports.ActionType = exports.APICommand = void 0;
 var APICommand_1 = require("./APICommand");
 Object.defineProperty(exports, "APICommand", { enumerable: true, get: function () { return APICommand_1.APICommand; } });
 var ActionType_1 = require("./ActionType");
@@ -13,6 +13,10 @@ var CallbackOperationType_1 = require("./CallbackOperationType");
 Object.defineProperty(exports, "CallbackOperationType", { enumerable: true, get: function () { return CallbackOperationType_1.CallbackOperationType; } });
 var CommandResponse_1 = require("./CommandResponse");
 Object.defineProperty(exports, "CommandResponse", { enumerable: true, get: function () { return CommandResponse_1.CommandResponse; } });
+var FirmwareErrorCode_1 = require("./FirmwareErrorCode");
+Object.defineProperty(exports, "FirmwareErrorCode", { enumerable: true, get: function () { return FirmwareErrorCode_1.FirmwareErrorCode; } });
+Object.defineProperty(exports, "FirmwareErrorDescriptions", { enumerable: true, get: function () { return FirmwareErrorCode_1.FirmwareErrorDescriptions; } });
+Object.defineProperty(exports, "describeFirmwareError", { enumerable: true, get: function () { return FirmwareErrorCode_1.describeFirmwareError; } });
 var CommandType_1 = require("./CommandType");
 Object.defineProperty(exports, "CommandType", { enumerable: true, get: function () { return CommandType_1.CommandType; } });
 var ConfigRemoteUnlock_1 = require("./ConfigRemoteUnlock");

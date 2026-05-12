@@ -11,6 +11,7 @@ export { ScreenPasscodeManageCommand } from './ScreenPasscodeManageCommand';
 export { AutoLockManageCommand } from './AutoLockManageCommand';
 export { ControlLampCommand } from './ControlLampCommand';
 export { SetAdminKeyboardPwdCommand } from './SetAdminKeyboardPwdCommand';
+export { SetEraseKeyboardPwdCommand } from './SetEraseKeyboardPwdCommand';
 export { InitPasswordsCommand } from './InitPasswordsCommand';
 export { ControlRemoteUnlockCommand } from './ControlRemoteUnlockCommand';
 export { OperateFinishedCommand } from './OperateFinishedCommand';

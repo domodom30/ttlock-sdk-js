@@ -1,32 +1,29 @@
 'use strict';
 
-const { TTLockClient, sleep, PassageModeType } = require('../dist');
-const settingsFile = "lockData.json";
+const { TTLockClient } = require('../dist');
+const settingsFile = 'lockData.json';
 
 async function doStuff() {
-  let lockData = await require("./common/loadData")(settingsFile);
-  let options = require("./common/options")(lockData);
+  let lockData = await require('./common/loadData')(settingsFile);
+  let options = require('./common/options')(lockData);
 
   const client = new TTLockClient(options);
   await client.prepareBTService();
   client.startScanLock();
-  console.log("Scan started");
-  client.on("foundLock", async (lock) => {
-    
+  console.log('Scan started');
+  client.on('foundLock', async (lock) => {
     if (lock.isInitialized() && lock.isPaired()) {
       await lock.connect();
-      console.log("Trying to get lock/unlock status");
+      console.log('Trying to get lock/unlock status');
       console.log();
       console.log();
       const result = await lock.getLockStatus();
-      if (result != -1) {
-        if (result == 0) {
-          console.log("Lock is locked", result);
-        } else {
-          console.log("Lock is unlocked", result);
-        }
+      if (result == -1) {
+        console.log('Failed to get lock status');
+      } else if (result == 0) {
+        console.log('Lock is locked', result);
       } else {
-        console.log("Failed to get lock status");
+        console.log('Lock is unlocked', result);
       }
       await lock.disconnect();
 

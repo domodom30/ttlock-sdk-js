@@ -17,7 +17,9 @@ export declare class ManageKeyboardPasswordCommand extends Command {
     updatePasscode(type: KeyboardPwdType, oldPassCode: string, newPassCode: string, startDate?: string, endDate?: string): boolean;
     deletePasscode(type: KeyboardPwdType, oldPassCode: string): boolean;
     clearAllPasscodes(): void;
+    recoverPasscode(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string): boolean;
     private buildAdd;
+    private buildRecover;
     private buildDel;
     private buildEdit;
 }

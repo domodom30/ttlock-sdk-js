@@ -35,7 +35,14 @@ exports.LogOperateCategory = {
         LogOperate_1.LogOperate.APP_UNLOCK_FAILED_LOCK_REVERSE
     ],
     /** Gestion codes / mots de passe */
-    PASSCODE: [LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD, LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD, LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS, LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED, LogOperate_1.LogOperate.ADD_ADMIN_BY_KEYBOARD],
+    PASSCODE: [
+        LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD,
+        LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD,
+        LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS,
+        LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED,
+        LogOperate_1.LogOperate.ADD_ADMIN_BY_KEYBOARD,
+        LogOperate_1.LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD
+    ],
     /** Gestion cartes IC */
     IC: [LogOperate_1.LogOperate.OPERATE_TYPE_ADD_IC, LogOperate_1.LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED, LogOperate_1.LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED, LogOperate_1.LogOperate.OPERATE_TYPE_CLEAR_IC_SUCCEED, LogOperate_1.LogOperate.OPERATE_TYPE_IC_UNLOCK_FAILED, LogOperate_1.LogOperate.IC_LOCK],
     /** Gestion empreintes digitales */

@@ -149,6 +149,10 @@ export declare enum LogOperate {
     /** Reset button pressed */
     RESET_BUTTON = 48,
     /**
+     * Admin passcode modified via keyboard
+     */
+    MODIFY_ADMIN_KEYBOARD_PASSWORD = 92,
+    /**
      * Admin passcode set via keyboard during lock initialization
      */
     ADD_ADMIN_BY_KEYBOARD = 93,

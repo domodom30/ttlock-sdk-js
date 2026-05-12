@@ -41,6 +41,7 @@ exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SIN
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS] = 'Suppression de tous les codes';
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED] = 'Code remplacé (capacité maximale atteinte)';
 exports.LogOperateNames[LogOperate_1.LogOperate.ADD_ADMIN_BY_KEYBOARD] = 'Code administrateur défini via clavier (initialisation)';
+exports.LogOperateNames[LogOperate_1.LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD] = 'Code administrateur modifié via clavier';
 // --- Gestion cartes IC ---
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_ADD_IC] = 'Ajout carte IC';
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED] = "Suppression d'une carte IC";

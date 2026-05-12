@@ -30,6 +30,8 @@ class ManageKeyboardPasswordCommand extends Command_1.Command {
                 return this.buildDel();
             case PwdOperateType_1.PwdOperateType.PWD_OPERATE_TYPE_MODIFY:
                 return this.buildEdit();
+            case PwdOperateType_1.PwdOperateType.PWD_OPERATE_TYPE_RECOVERY:
+                return this.buildRecover();
         }
         return Buffer.from([]);
     }
@@ -95,14 +97,71 @@ class ManageKeyboardPasswordCommand extends Command_1.Command {
     clearAllPasscodes() {
         this.opType = PwdOperateType_1.PwdOperateType.PWD_OPERATE_TYPE_CLEAR;
     }
+    recoverPasscode(type, passCode, startDate = DateConstant_1.DateConstant.START_DATE_TIME, endDate = DateConstant_1.DateConstant.END_DATE_TIME) {
+        this.type = type;
+        if (passCode.length >= 4 && passCode.length <= 9) {
+            this.oldPassCode = "";
+            this.passCode = passCode;
+        }
+        else {
+            return false;
+        }
+        this.startDate = (0, moment_1.default)(startDate, "YYYYMMDDHHmm");
+        if (!this.startDate.isValid()) {
+            return false;
+        }
+        this.endDate = (0, moment_1.default)(endDate, "YYYYMMDDHHmm");
+        if (!this.endDate.isValid()) {
+            return false;
+        }
+        this.opType = PwdOperateType_1.PwdOperateType.PWD_OPERATE_TYPE_RECOVERY;
+        return true;
+    }
     buildAdd() {
         if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
             let data;
+            // PERMANENT writes startDate only (5 bytes); other types write startDate + endDate (10 bytes).
+            // The allocation must match the write logic below — swapping the condition was the original bug
+            // that caused RangeError on type 2 (count-limited) and other non-permanent passcodes.
             if (this.type == KeyboardPwdType_1.KeyboardPwdType.PWD_TYPE_PERMANENT) {
-                data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5 + 5);
+                data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5);
             }
             else {
+                data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5 + 5);
+            }
+            let index = 0;
+            data.writeUInt8(this.opType, index++);
+            data.writeUInt8(this.type, index++);
+            data.writeUInt8(this.passCode.length, index++);
+            for (let i = 0; i < this.passCode.length; i++) {
+                data.writeUInt8(this.passCode.charCodeAt(i), index++);
+            }
+            data.writeUInt8(parseInt(this.startDate.format("YY")), index++);
+            data.writeUInt8(parseInt(this.startDate.format("MM")), index++);
+            data.writeUInt8(parseInt(this.startDate.format("DD")), index++);
+            data.writeUInt8(parseInt(this.startDate.format("HH")), index++);
+            data.writeUInt8(parseInt(this.startDate.format("mm")), index++);
+            if (this.type != KeyboardPwdType_1.KeyboardPwdType.PWD_TYPE_PERMANENT) {
+                data.writeUInt8(parseInt(this.endDate.format("YY")), index++);
+                data.writeUInt8(parseInt(this.endDate.format("MM")), index++);
+                data.writeUInt8(parseInt(this.endDate.format("DD")), index++);
+                data.writeUInt8(parseInt(this.endDate.format("HH")), index++);
+                data.writeUInt8(parseInt(this.endDate.format("mm")), index++);
+            }
+            return data;
+        }
+        else {
+            return Buffer.from([]);
+        }
+    }
+    buildRecover() {
+        if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+            let data;
+            if (this.type == KeyboardPwdType_1.KeyboardPwdType.PWD_TYPE_PERMANENT) {
                 data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5);
+            }
+            else {
+                data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5 + 5);
             }
             let index = 0;
             data.writeUInt8(this.opType, index++);

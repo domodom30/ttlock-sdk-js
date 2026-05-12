@@ -32,6 +32,20 @@ export interface OperationLogResponse {
     sequence: number;
     data: LogEntry[];
 }
+export declare class NoMoreOperationDataError extends Error {
+    readonly sequence: number;
+    constructor(sequence: number);
+}
+export type LockFirmwareOperation = 'create passcode' | 'update passcode' | 'delete passcode' | 'clear passcodes' | 'get passcodes' | 'get admin passcode' | 'set admin keyboard passcode' | string;
+export declare class LockFirmwareError extends Error {
+    readonly operation: LockFirmwareOperation;
+    readonly response: number;
+    readonly code: number | null;
+    constructor(operation: LockFirmwareOperation, response: number, code: number | null);
+}
+export type PasscodeOperation = LockFirmwareOperation;
+export declare const PasscodeOperationError: typeof LockFirmwareError;
+export type PasscodeOperationError = LockFirmwareError;
 export interface LockParamsChanged {
     lockedStatus: boolean;
     newEvents: boolean;
@@ -109,6 +123,13 @@ export declare abstract class TTLockApi extends EventEmitter {
      */
     protected setAdminKeyboardPwdCommand(adminPasscode?: string, aesKey?: Buffer): Promise<string>;
     /**
+     * Send SetDeletePwd (COMM_SET_DELETE_PWD = 0x44).
+     * Programs an "erase passcode" that, when typed on the physical keyboard, factory-resets the lock.
+     * Useful when BLE admin-write commands are blocked by firmware lockdown (0x14): if this command
+     * itself succeeds, you have a keyboard-based recovery path without resorting to a hardware reset.
+     */
+    protected setEraseKeyboardPwdCommand(erasePasscode: string, aesKey?: Buffer): Promise<string>;
+    /**
      * Send InitPasswords command
      */
     protected initPasswordsCommand(aesKey?: Buffer): Promise<CodeSecret[]>;
@@ -132,6 +153,7 @@ export declare abstract class TTLockApi extends EventEmitter {
     protected clearPassageModeCommand(aesKey?: Buffer): Promise<boolean>;
     protected searchBycicleStatusCommand(aesKey?: Buffer): Promise<number>;
     protected createCustomPasscodeCommand(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string, aesKey?: Buffer): Promise<boolean>;
+    protected recoverCustomPasscodeCommand(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string, aesKey?: Buffer): Promise<boolean>;
     protected updateCustomPasscodeCommand(type: KeyboardPwdType, oldPassCode: string, newPassCode: string, startDate?: string, endDate?: string, aesKey?: Buffer): Promise<boolean>;
     protected deleteCustomPasscodeCommand(type: KeyboardPwdType, passCode: string, aesKey?: Buffer): Promise<boolean>;
     protected clearCustomPasscodesCommand(aesKey?: Buffer): Promise<boolean>;

@@ -45,6 +45,7 @@ LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD] = "Supp
 LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS] = 'Suppression de tous les codes';
 LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED] = 'Code remplacé (capacité maximale atteinte)';
 LogOperateNames[LogOperate.ADD_ADMIN_BY_KEYBOARD] = 'Code administrateur défini via clavier (initialisation)';
+LogOperateNames[LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD] = 'Code administrateur modifié via clavier';
 
 // --- Gestion cartes IC ---
 LogOperateNames[LogOperate.OPERATE_TYPE_ADD_IC] = 'Ajout carte IC';

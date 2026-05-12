@@ -14,12 +14,16 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CommandEnvelope = exports.ValidityInfo = exports.TTLock = exports.TTLockClient = void 0;
+exports.CommandEnvelope = exports.ValidityInfo = exports.LockFirmwareError = exports.PasscodeOperationError = exports.NoMoreOperationDataError = exports.TTLock = exports.TTLockClient = void 0;
 process.env.NOBLE_REPORT_ALL_HCI_EVENTS = "1";
 var TTLockClient_1 = require("./TTLockClient");
 Object.defineProperty(exports, "TTLockClient", { enumerable: true, get: function () { return TTLockClient_1.TTLockClient; } });
 var TTLock_1 = require("./device/TTLock");
 Object.defineProperty(exports, "TTLock", { enumerable: true, get: function () { return TTLock_1.TTLock; } });
+var TTLockApi_1 = require("./device/TTLockApi");
+Object.defineProperty(exports, "NoMoreOperationDataError", { enumerable: true, get: function () { return TTLockApi_1.NoMoreOperationDataError; } });
+Object.defineProperty(exports, "PasscodeOperationError", { enumerable: true, get: function () { return TTLockApi_1.PasscodeOperationError; } });
+Object.defineProperty(exports, "LockFirmwareError", { enumerable: true, get: function () { return TTLockApi_1.LockFirmwareError; } });
 var ValidityInfo_1 = require("./api/ValidityInfo");
 Object.defineProperty(exports, "ValidityInfo", { enumerable: true, get: function () { return ValidityInfo_1.ValidityInfo; } });
 __exportStar(require("./constant"), exports);

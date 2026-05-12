@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import { CommandEnvelope, KeyboardPwdType, TTLockData } from '..';
 import { AudioManage } from '../constant/AudioManage';
 import { CommandResponse } from '../constant/CommandResponse';
+import { describeFirmwareError } from '../constant/FirmwareErrorCode';
 import { CommandType } from '../constant/CommandType';
 import { ConfigRemoteUnlock } from '../constant/ConfigRemoteUnlock';
 import { FeatureValue } from '../constant/FeatureValue';
@@ -21,6 +22,7 @@ import {
   InitPasswordsCommand,
   ScreenPasscodeManageCommand,
   SetAdminKeyboardPwdCommand,
+  SetEraseKeyboardPwdCommand,
   ControlRemoteUnlockCommand,
   DeviceFeaturesCommand,
   OperateFinishedCommand,
@@ -82,6 +84,46 @@ export interface OperationLogResponse {
   sequence: number;
   data: LogEntry[];
 }
+
+// Thrown when the lock answers an operation log request with FAILED + commandData=0x01,
+// which the firmware uses as a "no record at this sequence" sentinel rather than a real
+// protocol error. Callers should skip the sequence instead of retrying.
+export class NoMoreOperationDataError extends Error {
+  constructor(public readonly sequence: number) {
+    super(`No operation log data at sequence ${sequence}`);
+    this.name = 'NoMoreOperationDataError';
+  }
+}
+
+// Operation labels used in error messages. Open string union so admin-side commands
+// (set-admin-passcode, set-admin-keyboard-passcode) can reuse the same class.
+export type LockFirmwareOperation =
+  | 'create passcode' | 'update passcode' | 'delete passcode'
+  | 'clear passcodes' | 'get passcodes'
+  | 'get admin passcode' | 'set admin keyboard passcode'
+  | string;
+
+// Thrown when the lock answers an admin-write operation with FAILED instead of SUCCESS.
+// `code` is the first byte of commandData when present — see FirmwareErrorCode for
+// known values. The message embeds a human-readable description of the firmware code.
+export class LockFirmwareError extends Error {
+  constructor(
+    public readonly operation: LockFirmwareOperation,
+    public readonly response: number,
+    public readonly code: number | null
+  ) {
+    const codeStr = code !== null ? '0x' + code.toString(16).padStart(2, '0') : 'n/a';
+    const description = describeFirmwareError(code);
+    super(`Lock rejected ${operation} (response=${response}, code=${codeStr}: ${description})`);
+    this.name = 'LockFirmwareError';
+  }
+}
+
+// Backwards-compat aliases — kept so external code that catches PasscodeOperationError
+// or reads TTLock.lastPasscodeError still works without changes.
+export type PasscodeOperation = LockFirmwareOperation;
+export const PasscodeOperationError = LockFirmwareError;
+export type PasscodeOperationError = LockFirmwareError;
 
 export interface LockParamsChanged {
   lockedStatus: boolean;
@@ -521,7 +563,9 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       const cmd = responseEnvelope.getCommand() as GetAdminCodeCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed to set adminPasscode');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('get admin passcode', cmd.getResponse(), code);
       }
       const adminPasscode = cmd.getAdminPasscode();
       if (adminPasscode) {
@@ -561,11 +605,46 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       cmd = responseEnvelope.getCommand() as SetAdminKeyboardPwdCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed to set adminPasscode');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('set admin keyboard passcode', cmd.getResponse(), code);
       }
       return adminPasscode;
     } else {
       throw new Error('No response to set adminPasscode');
+    }
+  }
+
+  /**
+   * Send SetDeletePwd (COMM_SET_DELETE_PWD = 0x44).
+   * Programs an "erase passcode" that, when typed on the physical keyboard, factory-resets the lock.
+   * Useful when BLE admin-write commands are blocked by firmware lockdown (0x14): if this command
+   * itself succeeds, you have a keyboard-based recovery path without resorting to a hardware reset.
+   */
+  protected async setEraseKeyboardPwdCommand(erasePasscode: string, aesKey?: Buffer): Promise<string> {
+    if (typeof aesKey == 'undefined') {
+      if (this.privateData.aesKey) {
+        aesKey = this.privateData.aesKey;
+      } else {
+        throw new Error('No AES key for lock');
+      }
+    }
+    const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
+    requestEnvelope.setCommandType(CommandType.COMM_SET_DELETE_PWD);
+    let cmd = requestEnvelope.getCommand() as SetEraseKeyboardPwdCommand;
+    cmd.setErasePasscode(erasePasscode);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+    if (responseEnvelope) {
+      responseEnvelope.setAesKey(aesKey);
+      cmd = responseEnvelope.getCommand() as SetEraseKeyboardPwdCommand;
+      if (cmd.getResponse() != CommandResponse.SUCCESS) {
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('set erase passcode', cmd.getResponse(), code);
+      }
+      return erasePasscode;
+    } else {
+      throw new Error('No response to set erasePasscode');
     }
   }
 
@@ -984,11 +1063,40 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       const cmd = responseEnvelope.getCommand() as ManageKeyboardPasswordCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed create passcode response');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('create passcode', cmd.getResponse(), code);
       }
       return true;
     } else {
       throw new Error('No response to create passcode');
+    }
+  }
+
+  protected async recoverCustomPasscodeCommand(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string, aesKey?: Buffer): Promise<boolean> {
+    if (typeof aesKey == 'undefined') {
+      if (this.privateData.aesKey) {
+        aesKey = this.privateData.aesKey;
+      } else {
+        throw new Error('No AES key for lock');
+      }
+    }
+    const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
+    requestEnvelope.setCommandType(CommandType.COMM_MANAGE_KEYBOARD_PASSWORD);
+    let cmd = requestEnvelope.getCommand() as ManageKeyboardPasswordCommand;
+    cmd.recoverPasscode(type, passCode, startDate, endDate);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+    if (responseEnvelope) {
+      responseEnvelope.setAesKey(aesKey);
+      const cmd = responseEnvelope.getCommand() as ManageKeyboardPasswordCommand;
+      if (cmd.getResponse() != CommandResponse.SUCCESS) {
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('recover passcode', cmd.getResponse(), code);
+      }
+      return true;
+    } else {
+      throw new Error('No response to recover passcode');
     }
   }
 
@@ -1009,7 +1117,9 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       const cmd = responseEnvelope.getCommand() as ManageKeyboardPasswordCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed update passcode response');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('update passcode', cmd.getResponse(), code);
       }
       return true;
     } else {
@@ -1034,7 +1144,9 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       const cmd = responseEnvelope.getCommand() as ManageKeyboardPasswordCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed delete passcode response');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('delete passcode', cmd.getResponse(), code);
       }
       return true;
     } else {
@@ -1059,7 +1171,9 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       const cmd = responseEnvelope.getCommand() as ManageKeyboardPasswordCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed clear passcodes response');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        throw new LockFirmwareError('clear passcodes', cmd.getResponse(), code);
       }
       return true;
     } else {
@@ -1084,7 +1198,14 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       cmd = responseEnvelope.getCommand() as GetKeyboardPasswordsCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
-        throw new Error('Failed get passCodes response');
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+        // FAILED + code=0x01 : sentinel firmware "fin de liste" (aucun code à cette séquence)
+        // On retourne sequence=-1 pour signaler la fin de l'itération sans lever d'erreur.
+        if (code === 0x01) {
+          return { sequence: -1, data: [] };
+        }
+        throw new LockFirmwareError('get passcodes', cmd.getResponse(), code);
       }
       return {
         sequence: cmd.getSequence(),
@@ -1418,6 +1539,12 @@ export abstract class TTLockApi extends EventEmitter {
       responseEnvelope.setAesKey(aesKey);
       cmd = responseEnvelope.getCommand() as OperationLogCommand;
       if (cmd.getResponse() != CommandResponse.SUCCESS) {
+        // Firmware returns FAILED + commandData=0x01 as a "no record at this sequence"
+        // sentinel — surface it so callers can skip without burning retries.
+        const rawData = (cmd as any).commandData as Buffer | undefined;
+        if (rawData && rawData.length >= 1 && rawData[0] === 0x01) {
+          throw new NoMoreOperationDataError(sequence);
+        }
         throw new Error('Failed get OperationLog response');
       }
       return {
@@ -1465,11 +1592,18 @@ export abstract class TTLockApi extends EventEmitter {
     return deviceInfo;
   }
 
-  protected async macro_adminLogin(maxRetries: number = 3, retryDelayMs: number = 600): Promise<boolean> {
+  protected async macro_adminLogin(maxRetries: number = 3, retryDelayMs: number = 200): Promise<boolean> {
     if (this.adminAuth) {
       return true;
     }
+    let lastError: unknown = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Bail out fast if the BLE session is already gone — retrying would just
+      // burn ~10 s per attempt waiting for sendCommand timeouts on a dead session.
+      if (!this.device.connected) {
+        log(`macro_adminLogin: lock disconnected before attempt ${attempt}/${maxRetries}`);
+        return false;
+      }
       try {
         log(`========= check admin (attempt ${attempt}/${maxRetries})`);
         const psFromLock = await this.checkAdminCommand();
@@ -1481,15 +1615,29 @@ export abstract class TTLockApi extends EventEmitter {
           this.adminAuth = true;
           return true;
         } else {
-          log.error('Invalid psFromLock received', psFromLock);
+          lastError = new Error(`Invalid psFromLock received: ${psFromLock}`);
+          log(`macro_adminLogin attempt ${attempt}/${maxRetries}: invalid psFromLock`, psFromLock);
         }
       } catch (error) {
-        log.error(`macro_adminLogin attempt ${attempt}/${maxRetries}:`, error);
+        lastError = error;
+        // The lock often invalidates its random challenge if checkRandom arrives too late;
+        // a fresh checkAdmin on the next attempt regenerates a valid challenge. Don't log
+        // as error unless every attempt fails — the retry is the normal recovery path.
+        log(`macro_adminLogin attempt ${attempt}/${maxRetries} failed (will retry):`, error);
+        // If the failure was caused by a disconnect, abort immediately —
+        // every subsequent attempt would just timeout on the dead session.
+        // Logged at debug level: TTLock firmware self-disconnects mid-handshake
+        // is normal, and the caller's retry/reconnect loop handles recovery.
+        if (!this.device.connected) {
+          log(`macro_adminLogin: lock disconnected during attempt ${attempt}/${maxRetries}`, error);
+          return false;
+        }
       }
       if (attempt < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
+    log.error(`macro_adminLogin failed after ${maxRetries} attempts:`, lastError);
     return false;
   }
 }

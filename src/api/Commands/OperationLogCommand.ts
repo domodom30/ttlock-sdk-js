@@ -63,7 +63,7 @@ export class OperationLogCommand extends Command {
               log.recordId = this.commandData.readUInt32BE(index);
               index += 4;
               if (log.recordType == LogOperate.REMOTE_CONTROL_KEY) {
-                log.keyId = this.commandData.readUInt8(index);
+                log.keyId = this.commandData.readUInt8(index++);
               }
               break;
 
@@ -74,10 +74,8 @@ export class OperationLogCommand extends Command {
             case LogOperate.OPERATE_TYPE_PASSCODE_IN_BLACK_LIST:
             case LogOperate.PASSCODE_LOCK:
             case LogOperate.PASSCODE_UNLOCK_FAILED_LOCK_REVERSE:
-
             case LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD:
             case LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD:
-
             case LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED:
             case LogOperate.ADD_ADMIN_BY_KEYBOARD:
               pwdLen = this.commandData.readUInt8(index++);
@@ -163,7 +161,7 @@ export class OperationLogCommand extends Command {
                 this.commandData.readUInt8(index).toString(16);
               index += 6;
               log.keyId = this.commandData.readUInt8(index++);
-              log.accessoryElectricQuantity = this.commandData.readUInt8(index);
+              log.accessoryElectricQuantity = this.commandData.readUInt8(index++);
               break;
 
             case LogOperate.TAMPER_ALARM:

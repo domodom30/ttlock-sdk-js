@@ -162,6 +162,10 @@ var LogOperate;
     /** Reset button pressed */
     LogOperate[LogOperate["RESET_BUTTON"] = 48] = "RESET_BUTTON";
     /**
+     * Admin passcode modified via keyboard
+     */
+    LogOperate[LogOperate["MODIFY_ADMIN_KEYBOARD_PASSWORD"] = 92] = "MODIFY_ADMIN_KEYBOARD_PASSWORD";
+    /**
      * Admin passcode set via keyboard during lock initialization
      */
     LogOperate[LogOperate["ADD_ADMIN_BY_KEYBOARD"] = 93] = "ADD_ADMIN_BY_KEYBOARD";

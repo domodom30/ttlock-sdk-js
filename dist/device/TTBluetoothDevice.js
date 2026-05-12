@@ -105,7 +105,15 @@ class TTBluetoothDevice extends TTDevice_1.TTDevice {
     }
     async onDeviceDisconnected() {
         this.connected = false;
-        // console.log("TTBluetoothDevice disconnected", this.device?.id);
+        // Abort any in-flight sendCommand so a rapid reconnect can't find
+        // waitingForResponse=true and throw "Command already in progress".
+        // Setting malformedResponse wakes up the poll loop which throws and
+        // cleans up waitingForResponse via its finally.
+        if (this.waitingForResponse) {
+            this.malformedResponse = new Error("BLE disconnected");
+        }
+        this.responses = [];
+        this.incomingDataBuffer = Buffer.from([]);
         this.emit("disconnected");
     }
     async readBasicInfo() {

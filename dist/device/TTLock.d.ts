@@ -8,7 +8,7 @@ import { LockedStatus } from '../constant/LockedStatus';
 import { LockSoundVolume } from '../constant/LockSoundVolume';
 import { TTLockData } from '../store/TTLockData';
 import { TTBluetoothDevice } from './TTBluetoothDevice';
-import { LockParamsChanged, TTLockApi } from './TTLockApi';
+import { LockParamsChanged, PasscodeOperationError, TTLockApi } from './TTLockApi';
 export interface TTLock {
     /** Event used by TTLockClient to update it's internal lock data */
     on(event: 'dataUpdated', listener: (lock: TTLock) => void): this;
@@ -29,6 +29,7 @@ export declare class TTLock extends TTLockApi implements TTLock {
     private connected;
     private skipDataRead;
     private connecting;
+    lastPasscodeError: PasscodeOperationError | null;
     constructor(device: TTBluetoothDevice, data?: TTLockData);
     getAddress(): string;
     getName(): string;
@@ -79,6 +80,14 @@ export declare class TTLock extends TTLockApi implements TTLock {
      */
     initLock(): Promise<boolean>;
     /**
+     * Obtient un psFromLock valide pour une opération lock/unlock.
+     * Essaie d'abord la voie "user" (checkUserTime). Si la serrure la rejette
+     * (pas d'utilisateur enregistré, serrure type room-lock, etc.), bascule
+     * automatiquement sur la voie "admin" (checkAdmin seul — le challenge est
+     * ensuite consommé directement par unlockCommand/lockCommand via setSum).
+     */
+    private getPsFromLock;
+    /**
      * Lock the lock
      */
     lock(): Promise<boolean>;
@@ -115,6 +124,28 @@ export declare class TTLock extends TTLockApi implements TTLock {
      */
     setLockSound(lockSound: LockSoundVolume): Promise<boolean>;
     resetLock(): Promise<boolean>;
+    /**
+     * Re-synchronise le passcode admin du clavier physique de la serrure avec
+     * une valeur connue côté SDK. Ne touche pas au pairing BLE ni à `lockData.json`.
+     *
+     * Utile lorsque l'admin clavier a été modifié via la serrure (events
+     * recordType 92/93) et que le firmware bloque certaines opérations BLE
+     * (typiquement ajout de passcodes utilisateur → 0x14).
+     *
+     * @param passcode 4-9 chiffres. Si omis, un code aléatoire à 7 chiffres est généré.
+     * @returns Le passcode admin clavier effectivement défini, ou false en cas d'échec.
+     */
+    syncAdminKeyboardPasscode(passcode?: string): Promise<string | false>;
+    /**
+     * Programme un "erase passcode" : un code à 4-9 chiffres qui, tapé sur le clavier physique,
+     * déclenche un reset usine de la serrure. Utile en dernier recours quand le module clavier est
+     * verrouillé par le firmware (code 0x14) et que les commandes admin-write classiques sont
+     * rejetées — cette commande utilise COMM_SET_DELETE_PWD (0x44), un canal distinct.
+     *
+     * @param erasePasscode 4-9 chiffres
+     * @returns Le passcode défini, ou false en cas d'échec.
+     */
+    setErasePasscode(erasePasscode: string): Promise<string | false>;
     getPassageMode(): Promise<PassageModeData[]>;
     setPassageMode(data: PassageModeData): Promise<boolean>;
     deletePassageMode(data: PassageModeData): Promise<boolean>;
@@ -127,6 +158,17 @@ export declare class TTLock extends TTLockApi implements TTLock {
      * @param endDate Valid to YYYYMMDDHHmm
      */
     addPassCode(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string): Promise<boolean>;
+    /**
+     * Recover a passcode that was previously known to the lock (uses PwdOperateType.RECOVERY=6).
+     * Useful when the firmware passcode index is corrupted but the lock still has the slot reserved —
+     * recover may succeed where add returns 0x14 (keyboard module lockdown).
+     *
+     * @param type PassCode type: 1 - permanent, 2 - one time, 3 - limited time
+     * @param passCode 4-9 digits code
+     * @param startDate Valid from YYYYMMDDHHmm
+     * @param endDate Valid to YYYYMMDDHHmm
+     */
+    recoverPassCode(type: KeyboardPwdType, passCode: string, startDate?: string, endDate?: string): Promise<boolean>;
     /**
      * Update a passcode to unlock
      * @param type PassCode type: 1 - permanent, 2 - one time, 3 - limited time

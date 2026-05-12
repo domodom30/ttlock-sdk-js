@@ -42,7 +42,7 @@ class OperationLogCommand extends Command_1.Command {
                             log.recordId = this.commandData.readUInt32BE(index);
                             index += 4;
                             if (log.recordType == LogOperate_1.LogOperate.REMOTE_CONTROL_KEY) {
-                                log.keyId = this.commandData.readUInt8(index);
+                                log.keyId = this.commandData.readUInt8(index++);
                             }
                             break;
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK:
@@ -134,7 +134,7 @@ class OperationLogCommand extends Command_1.Command {
                                     this.commandData.readUInt8(index).toString(16);
                             index += 6;
                             log.keyId = this.commandData.readUInt8(index++);
-                            log.accessoryElectricQuantity = this.commandData.readUInt8(index);
+                            log.accessoryElectricQuantity = this.commandData.readUInt8(index++);
                             break;
                         case LogOperate_1.LogOperate.TAMPER_ALARM:
                         case LogOperate_1.LogOperate.LOW_BATTERY_ALARM:

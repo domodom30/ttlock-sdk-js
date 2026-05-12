@@ -6,6 +6,7 @@ export { AudioManage } from './AudioManage';
 export { AutoLockOperate } from './AutoLockOperate';
 export { CallbackOperationType } from './CallbackOperationType';
 export { CommandResponse } from './CommandResponse';
+export { FirmwareErrorCode, FirmwareErrorDescriptions, describeFirmwareError } from './FirmwareErrorCode';
 export { CommandType } from './CommandType';
 export { ConfigRemoteUnlock } from './ConfigRemoteUnlock';
 export { ControlAction } from './ControlAction';

@@ -33,6 +33,8 @@ export class ManageKeyboardPasswordCommand extends Command {
         return this.buildDel();
       case PwdOperateType.PWD_OPERATE_TYPE_MODIFY:
         return this.buildEdit();
+      case PwdOperateType.PWD_OPERATE_TYPE_RECOVERY:
+        return this.buildRecover();
     }
     return Buffer.from([]);
   }
@@ -100,13 +102,73 @@ export class ManageKeyboardPasswordCommand extends Command {
     this.opType = PwdOperateType.PWD_OPERATE_TYPE_CLEAR;
   }
 
+  recoverPasscode(type: KeyboardPwdType, passCode: string, startDate: string = DateConstant.START_DATE_TIME, endDate: string = DateConstant.END_DATE_TIME): boolean {
+    this.type = type;
+    if (passCode.length >= 4 && passCode.length <= 9) {
+      this.oldPassCode = "";
+      this.passCode = passCode;
+    } else {
+      return false;
+    }
+    this.startDate = moment(startDate, "YYYYMMDDHHmm");
+    if (!this.startDate.isValid()) {
+      return false;
+    }
+    this.endDate = moment(endDate, "YYYYMMDDHHmm");
+    if (!this.endDate.isValid()) {
+      return false;
+    }
+    this.opType = PwdOperateType.PWD_OPERATE_TYPE_RECOVERY;
+    return true;
+  }
+
   private buildAdd(): Buffer {
     if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
       let data: Buffer;
+      // PERMANENT writes startDate only (5 bytes); other types write startDate + endDate (10 bytes).
+      // The allocation must match the write logic below — swapping the condition was the original bug
+      // that caused RangeError on type 2 (count-limited) and other non-permanent passcodes.
       if (this.type == KeyboardPwdType.PWD_TYPE_PERMANENT) {
-        data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5 + 5);
-      } else {
         data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5);
+      } else {
+        data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5 + 5);
+      }
+      let index = 0;
+      data.writeUInt8(this.opType, index++);
+      data.writeUInt8(this.type, index++);
+      data.writeUInt8(this.passCode.length, index++);
+
+      for (let i = 0; i < this.passCode.length; i++) {
+        data.writeUInt8(this.passCode.charCodeAt(i), index++);
+      }
+
+      data.writeUInt8(parseInt(this.startDate.format("YY")), index++);
+      data.writeUInt8(parseInt(this.startDate.format("MM")), index++);
+      data.writeUInt8(parseInt(this.startDate.format("DD")), index++);
+      data.writeUInt8(parseInt(this.startDate.format("HH")), index++);
+      data.writeUInt8(parseInt(this.startDate.format("mm")), index++);
+
+      if (this.type != KeyboardPwdType.PWD_TYPE_PERMANENT) {
+        data.writeUInt8(parseInt(this.endDate.format("YY")), index++);
+        data.writeUInt8(parseInt(this.endDate.format("MM")), index++);
+        data.writeUInt8(parseInt(this.endDate.format("DD")), index++);
+        data.writeUInt8(parseInt(this.endDate.format("HH")), index++);
+        data.writeUInt8(parseInt(this.endDate.format("mm")), index++);
+      }
+
+      return data;
+    } else {
+      return Buffer.from([]);
+    }
+  }
+
+  private buildRecover(): Buffer {
+    if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+      let data: Buffer;
+      if (this.type == KeyboardPwdType.PWD_TYPE_PERMANENT) {
+        data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5);
+      } else {
+        data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5 + 5);
       }
       let index = 0;
       data.writeUInt8(this.opType, index++);
