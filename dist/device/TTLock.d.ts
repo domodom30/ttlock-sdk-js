@@ -253,6 +253,17 @@ export declare class TTLock extends TTLockApi implements TTLock {
      */
     setRemoteUnlock(type?: ConfigRemoteUnlock.OP_CLOSE | ConfigRemoteUnlock.OP_OPEN): Promise<ConfigRemoteUnlock.OP_CLOSE | ConfigRemoteUnlock.OP_OPEN | undefined>;
     getOperationLog(all?: boolean, noCache?: boolean): Promise<LogEntry[]>;
+    /**
+     * Probe a single operation log sequence directly, bypassing all cache logic.
+     * Intended for debugging firmware behavior at specific sequence numbers.
+     * Returns null if the lock is not connected or admin auth fails.
+     * Returns { sequence, data } on success (data may be an empty array if the
+     * firmware has no record at this sequence).
+     */
+    probeOperationLog(sequence: number): Promise<{
+        sequence: number;
+        data: LogEntry[];
+    } | null>;
     private onDataReceived;
     private onConnected;
     private onDisconnected;

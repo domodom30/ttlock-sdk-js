@@ -55,6 +55,7 @@ class OperationLogCommand extends Command_1.Command {
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD:
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD:
                         case LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED:
+                        case LogOperate_1.LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD:
                         case LogOperate_1.LogOperate.ADD_ADMIN_BY_KEYBOARD:
                             pwdLen = this.commandData.readUInt8(index++);
                             log.password = this.commandData.subarray(index, index + pwdLen).toString('ascii');

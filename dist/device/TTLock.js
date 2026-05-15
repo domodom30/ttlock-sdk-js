@@ -1376,6 +1376,15 @@ class TTLock extends TTLockApi_1.TTLockApi {
         {
             let sequence = 0xffff;
             let retry = 0;
+            // Cache-aware early exit: the 0xffff path streams the full history
+            // newest→oldest. Without this guard the loop re-walked every record on
+            // every call (~12 min for 3788 records) and the warm cache restored from
+            // lockData.json was wasted because it is only consulted AFTER this loop.
+            // Once a full page contains only records already cached, every older
+            // record is cached too → stop. Require 2 consecutive fully-known pages
+            // for robustness against any firmware reordering. On a cold cache no page
+            // is ever fully known, so the full sweep still runs (unavoidable once).
+            let knownPages = 0;
             do {
                 log('========= get OperationLog', sequence);
                 try {
@@ -1384,13 +1393,26 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     }
                     const response = await this.getOperationLogCommand(sequence);
                     sequence = response.sequence;
+                    let pageHadNew = false;
                     for (let entry of response.data) {
                         if (entry) {
+                            const cached = this.operationLog[entry.recordNumber];
+                            if (typeof cached == 'undefined' || cached == null) {
+                                pageHadNew = true;
+                            }
                             newOperations.push(entry);
                             this.operationLog[entry.recordNumber] = entry;
                         }
                     }
                     retry = 0;
+                    if (!pageHadNew && response.data.length > 0) {
+                        if (++knownPages >= 2) {
+                            break;
+                        }
+                    }
+                    else {
+                        knownPages = 0;
+                    }
                 }
                 catch (error) {
                     // Firmware sentinel "no more data" — exit the loop without burning retries
@@ -1479,13 +1501,60 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 } while (keepGoing && retry < maxRetry);
             }
             else {
-                // if we have operations, check for missing
+                // if we have operations, compute missing record numbers (cheap, no BLE)
                 let missing = [];
                 for (let i = 0; i < maxRecordNumber; i++) {
                     if (typeof operations[i] == 'undefined' || operations[i] == null) {
                         missing.push(i);
                     }
                 }
+                // Probe beyond maxRecordNumber FIRST — before the potentially long
+                // missing-gap backfill. New (appended) records are ONLY surfaced here:
+                // the 0xffff Phase 1 does not return them (firmware behaviour). The
+                // lock self-disconnects, and this loop is gated by this.isConnected(),
+                // so it must run while the BLE link is freshest — otherwise the guard
+                // skips it and every operation newer than the cached snapshot is
+                // silently and permanently lost.
+                //
+                // Wrap-around: past the journal end, the firmware echoes an old
+                // record (recordNumber <= maxRecordNumber, typically the init record
+                // at recordNumber=1 with nextSeq=2). Treat those as "empty" so the
+                // sweep can terminate.
+                const probeMaxConsecutiveEmpty = 20;
+                let probeSeq = maxRecordNumber + 1;
+                let consecutiveEmpty = 0;
+                while (consecutiveEmpty < probeMaxConsecutiveEmpty && this.isConnected()) {
+                    log('========= get OperationLog probe', probeSeq);
+                    let producedNewRecord = false;
+                    try {
+                        const response = await this.getOperationLogCommand(probeSeq);
+                        if (response.data && response.data.length > 0) {
+                            for (let entry of response.data) {
+                                if (entry && entry.recordNumber > maxRecordNumber) {
+                                    operations[entry.recordNumber] = entry;
+                                    producedNewRecord = true;
+                                }
+                            }
+                        }
+                    }
+                    catch (error) {
+                        // NoMoreOperationDataError or transient BLE error: treated as empty.
+                        if (!(error instanceof TTLockApi_1.NoMoreOperationDataError)) {
+                            log('========= get OperationLog probe error', probeSeq, error);
+                        }
+                    }
+                    if (producedNewRecord) {
+                        consecutiveEmpty = 0;
+                    }
+                    else {
+                        consecutiveEmpty++;
+                    }
+                    probeSeq++;
+                }
+                // Backfill old gaps last (best-effort). May run on a degraded/
+                // disconnected link — getOperationLogCommand then fails and the gap
+                // is skipped, which is acceptable since new records were already
+                // captured by the probe above.
                 for (let sequence of missing) {
                     let retry = 0;
                     let success = false;
@@ -1524,6 +1593,32 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 this.emit('dataUpdated', this);
             }
             return newOperations;
+        }
+    }
+    /**
+     * Probe a single operation log sequence directly, bypassing all cache logic.
+     * Intended for debugging firmware behavior at specific sequence numbers.
+     * Returns null if the lock is not connected or admin auth fails.
+     * Returns { sequence, data } on success (data may be an empty array if the
+     * firmware has no record at this sequence).
+     */
+    async probeOperationLog(sequence) {
+        if (!this.initialized || !this.isConnected()) {
+            return null;
+        }
+        const adminOk = await this.macro_adminLogin();
+        if (!adminOk) {
+            return null;
+        }
+        try {
+            const response = await this.getOperationLogCommand(sequence);
+            return { sequence: response.sequence, data: response.data };
+        }
+        catch (error) {
+            if (error instanceof TTLockApi_1.NoMoreOperationDataError) {
+                return { sequence: 0, data: [] };
+            }
+            throw error;
         }
     }
     onDataReceived(command) {

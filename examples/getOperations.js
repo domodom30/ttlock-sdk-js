@@ -1,6 +1,7 @@
 'use strict';
 
 process.env.TTLOCK_IGNORE_CRC = '1'; // tolère les CRC corrompus (signal faible)
+process.env.TTLOCK_DEBUG = 'ttlock:*'; // active TOUS les namespaces du logger custom du SDK (api, ble, comm, command, scanner, aes)
 
 const { inspect } = require('node:util');
 const { TTLockClient, LogOperateNames } = require('../dist');

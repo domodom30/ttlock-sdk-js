@@ -815,6 +815,13 @@ class TTLockApi extends events_1.EventEmitter {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
+                // The lock actuates then immediately sends a SearchBicycleStatusCommand;
+                // its presence proves the unlock was performed (the COMM_UNLOCK ack is
+                // frequently CRC-corrupted or superseded). Accept it instead of a false
+                // negative that triggers pointless re-actuating retries.
+                if (responseEnvelope.getCommandType() == CommandType_1.CommandType.COMM_SEARCH_BICYCLE_STATUS) {
+                    return {};
+                }
                 throw new Error('Failed unlock response');
             }
             // it is possible here that the UnlockCommand will have a bad CRC
@@ -852,7 +859,17 @@ class TTLockApi extends events_1.EventEmitter {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
-                throw new Error('Failed unlock response');
+                // Security: a lock() must NEVER be reported successful unless the lock's
+                // own status notification explicitly confirms LOCKED. The
+                // COMM_FUNCTION_LOCK ack is frequently CRC-corrupted/superseded by a
+                // SearchBicycleStatusCommand; trust that status only when it says LOCKED.
+                if (responseEnvelope.getCommandType() == CommandType_1.CommandType.COMM_SEARCH_BICYCLE_STATUS) {
+                    const statusCmd = responseEnvelope.getCommand();
+                    if (statusCmd.getLockStatus() == LockedStatus_1.LockedStatus.LOCKED) {
+                        return {};
+                    }
+                }
+                throw new Error('Failed lock response');
             }
             // it is possible here that the LockCommand will have a bad CRC
             // and we will read a SearchBicycleStatusCommand  that is sent right after instead
@@ -1167,6 +1184,13 @@ class TTLockApi extends events_1.EventEmitter {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
+                const rawData = cmd.commandData;
+                const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+                // FAILED + code=0x01 : sentinel firmware "fin de liste" (aucun code à cette séquence)
+                // On retourne sequence=-1 pour signaler la fin de l'itération sans lever d'erreur.
+                if (code === 0x01) {
+                    return { sequence: -1, data: [] };
+                }
                 throw new Error('Failed get IC response');
             }
             this.batteryCapacity = cmd.getBatteryCapacity();
@@ -1325,6 +1349,13 @@ class TTLockApi extends events_1.EventEmitter {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
+                const rawData = cmd.commandData;
+                const code = rawData && rawData.length >= 1 ? rawData[0] : null;
+                // FAILED + code=0x01 : sentinel firmware "fin de liste" (aucun code à cette séquence)
+                // On retourne sequence=-1 pour signaler la fin de l'itération sans lever d'erreur.
+                if (code === 0x01) {
+                    return { sequence: -1, data: [] };
+                }
                 throw new Error('Failed get FR response');
             }
             this.batteryCapacity = cmd.getBatteryCapacity();
