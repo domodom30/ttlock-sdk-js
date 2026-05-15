@@ -4,9 +4,9 @@ exports.LogOperateNames = void 0;
 const LogOperate_1 = require("./LogOperate");
 exports.LogOperateNames = [];
 // --- Déverrouillages ---
-exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_MOBILE_UNLOCK] = 'Déverrouillage Bluetooth';
-exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK] = 'Déverrouillage par code';
-exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_USE_DELETE_CODE] = 'Déverrouillage par code à usage unique (efface les anciens)';
+exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_MOBILE_UNLOCK] = 'Déverrouillage Bluetooth / réseau';
+exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK] = 'Déverrouillage code';
+exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_USE_DELETE_CODE] = 'Déverrouillage code à usage unique (efface les anciens)';
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_BONG_UNLOCK_SUCCEED] = 'Déverrouillage bracelet Bong';
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED] = 'Déverrouillage empreinte';
 exports.LogOperateNames[LogOperate_1.LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED] = 'Déverrouillage carte IC';
