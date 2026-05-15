@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 export declare class NobleWebsocketBinding extends EventEmitter {
     private ws;
     private auth;
+    private connected;
     private wasReady;
     private buffer;
     private startScanCommand;

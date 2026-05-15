@@ -98,9 +98,16 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
     this.nobleState = state;
     if (this.nobleState == 'poweredOn') {
       this.emit('ready');
-    }
-    if (this.scannerState == 'starting' && this.nobleState == 'poweredOn') {
-      this.startNobleScan();
+      if (this.scannerState == 'starting') {
+        this.startNobleScan();
+      }
+    } else if (this.scannerState == 'scanning' || this.scannerState == 'starting') {
+      // Adapter / websocket gateway went away — we are no longer scanning.
+      // Reflect it so a later startScan() is permitted (it requires state
+      // 'stopped'/'unknown') and so the downstream monitoring flags reset via
+      // the scanStop event chain instead of wedging at a stale 'scanning'.
+      this.scannerState = 'stopped';
+      this.emit('scanStop');
     }
   }
 

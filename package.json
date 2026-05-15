@@ -1,6 +1,6 @@
 {
   "name": "@domodom30/ttlock-sdk-js",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "JavaScript/TypeScript SDK for TTLock BLE smart locks",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

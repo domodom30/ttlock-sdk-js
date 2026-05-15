@@ -111,19 +111,30 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   }
 
   async startMonitor(): Promise<boolean> {
-    if (this.bleService != null && !this.scanning && !this.monitoring) {
-      this.monitoring = true;
-      this.monitoring = await this.bleService.startScan(true);
-      return this.monitoring;
-    }
-    return false;
+    if (this.bleService == null) return false;
+    // Never interrupt an in-progress / requested manual scan.
+    if (this.scanning) return false;
+    // Already actively monitoring — idempotent success.
+    if (this.monitoring && this.bleService.isScanning()) return true;
+    // Re-arm. A silent gateway drop can leave `monitoring` stuck true with no
+    // matching scanStop (the scanner never reported stopping), which made the
+    // old `!this.monitoring` guard turn this into a permanent no-op — the
+    // monitor stayed dead until a manual scan. Reset and (re)start instead.
+    this.monitoring = true;
+    this.monitoring = await this.bleService.startScan(true);
+    return this.monitoring;
   }
 
   async stopMonitor(): Promise<boolean> {
-    if (this.bleService != null && this.isMonitoring()) {
+    if (this.bleService == null) return false;
+    // Always clear the flag, even when the scanner no longer reports
+    // 'scanning' (e.g. after a silent gateway drop). The old early-return left
+    // `monitoring` true forever, wedging every subsequent startMonitor().
+    this.monitoring = false;
+    if (this.bleService.isScanning()) {
       return await this.bleService.stopScan();
     }
-    return false;
+    return true;
   }
 
   isScanning(): boolean {

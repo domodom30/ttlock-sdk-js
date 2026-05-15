@@ -17,6 +17,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
         this.aesKey = crypto_js_1.default.enc.Hex.parse(key);
         this.credentials = user + ':' + pass;
         this.auth = false;
+        this.connected = false;
         this.wasReady = false;
         this.buffer = [];
         this.startScanCommand = null;
@@ -44,8 +45,20 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     onClose() {
         this.auth = false;
+        const wasConnected = this.connected;
+        this.connected = false;
+        // Allow the next successful connection to re-emit 'stateChange' (the guard
+        // below only fires it while wasReady is false). Without this the SDK never
+        // learns the link came back and monitoring stays silently dead.
+        this.wasReady = false;
         log(chalk_1.default.red('Websocket disconnected'));
-        // this.emit('stateChange', 'poweredOff');
+        // Surface the link going down as a BLE adapter power-off so the scanner
+        // state machine (NobleScanner) drops out of 'scanning' and downstream
+        // monitoring flags reset. Only emit on a real transition to avoid churn
+        // during reconnecting-websocket backoff (onerror fires repeatedly).
+        if (wasConnected) {
+            this.emit('stateChange', 'poweredOff');
+        }
         for (const [peripheralUuid, peripheral] of this.peripherals) {
             if (peripheral.connected) {
                 peripheral.connected = false;
@@ -81,6 +94,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
         else if (type === 'stateChange') {
             if (state == 'poweredOn' && !this.auth) {
                 this.auth = true;
+                this.connected = true;
                 if (this.buffer.length > 0) {
                     if (process.env.WEBSOCKET_DEBUG == '1') {
                         log('Sending buffered commands', this.buffer);
@@ -89,6 +103,16 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
                         this.sendCommand(command);
                     }
                     this.buffer = [];
+                }
+                // Resume an active scan after a reconnect: on a fresh websocket
+                // session the gateway has reset its BLE state and the original
+                // startScanning command is gone, so monitoring would silently stay
+                // dead unless we re-issue it.
+                if (this.startScanCommand != null) {
+                    if (process.env.WEBSOCKET_DEBUG == '1') {
+                        log('Resuming scan after reconnect', this.startScanCommand);
+                    }
+                    this.sendCommand(this.startScanCommand);
                 }
             }
             if (!this.wasReady) {
