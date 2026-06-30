@@ -203,7 +203,9 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       ]);
       // write with 20 bytes MTU
       const service = this.device?.services.get("1910");
-      if (typeof service != undefined) {
+      // `typeof` returns a string, so comparing against the value `undefined`
+      // was always true; compare against the string "undefined" instead.
+      if (typeof service != "undefined") {
         const characteristic = service?.characteristics.get("fff2");
         if (typeof characteristic != "undefined") {
           if (waitForResponse) {
@@ -457,7 +459,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
 
     this.isSettingMode = ((params & 0x4) != 0x0);
     if (LockVersion.getLockType(this) == LockType.LOCK_TYPE_V3 || LockVersion.getLockType(this) == LockType.LOCK_TYPE_V3_CAR) {
-      this.isTouch = ((params && 0x8) != 0x0);
+      this.isTouch = ((params & 0x8) != 0x0);
     } else if (LockVersion.getLockType(this) == LockType.LOCK_TYPE_CAR) {
       this.isTouch = false;
       this.isLockcar = true;

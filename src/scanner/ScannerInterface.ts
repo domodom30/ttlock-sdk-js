@@ -20,6 +20,7 @@ export interface ScannerInterface extends EventEmitter {
   startScan(passive: boolean): Promise<boolean>;
   stopScan(): Promise<boolean>;
   getState(): ScannerStateType;
+  destroy(): void;
   on(event: "ready", listener: () => void): this;
   on(event: "discover", listener: (device: DeviceInterface) => void): this;
   on(event: "scanStart", listener: () => void): this;

@@ -42,6 +42,10 @@ export class TTLock extends TTLockApi implements TTLock {
   private connected: boolean;
   private skipDataRead: boolean = false;
   private connecting: boolean = false;
+  // Pending auto-lock timer armed after an unlock(). Tracked so it can be
+  // cancelled on a manual lock/unlock or a disconnect, instead of firing a
+  // stale 'locked' event (and stacking duplicates across rapid unlocks).
+  private autoLockTimer?: ReturnType<typeof setTimeout>;
 
   // Detail of the most recent passcode-operation rejection by the firmware.
   // Reset at the start of each addPassCode/updatePassCode/deletePassCode/clearPassCodes/getPassCodes call.
@@ -174,19 +178,25 @@ export class TTLock extends TTLockApi implements TTLock {
     }
     this.connecting = true;
     this.skipDataRead = skipDataRead;
-    const connected = await this.device.connect();
-    let timeoutCycles = timeout * 10;
-    if (connected) {
-      log('Lock waiting for connection to be completed');
-      do {
-        await sleep(100);
-        timeoutCycles--;
-      } while (!this.connected && timeoutCycles > 0 && this.connecting);
-    } else {
-      log('Lock connect failed');
+    // try/finally so a throw from device.connect() (or the wait loop) still
+    // clears `connecting`; otherwise it stays true and every later connect()
+    // is permanently rejected by the guard above.
+    try {
+      const connected = await this.device.connect();
+      let timeoutCycles = timeout * 10;
+      if (connected) {
+        log('Lock waiting for connection to be completed');
+        do {
+          await sleep(100);
+          timeoutCycles--;
+        } while (!this.connected && timeoutCycles > 0 && this.connecting);
+      } else {
+        log('Lock connect failed');
+      }
+    } finally {
+      this.skipDataRead = false;
+      this.connecting = false;
     }
-    this.skipDataRead = false;
-    this.connecting = false;
     // it is possible that even tho device initially connected, reading initial data will disconnect
     return this.connected;
   }
@@ -432,6 +442,11 @@ export class TTLock extends TTLockApi implements TTLock {
       log('========= lock');
       const lockData = await this.lockCommand(psFromLock);
       log('========= lock', lockData);
+      // A manual lock supersedes any pending auto-lock timer.
+      if (this.autoLockTimer) {
+        clearTimeout(this.autoLockTimer);
+        this.autoLockTimer = undefined;
+      }
       this.lockedStatus = LockedStatus.LOCKED;
       this.emit('locked', this);
     } catch (error) {
@@ -462,8 +477,13 @@ export class TTLock extends TTLockApi implements TTLock {
       this.lockedStatus = LockedStatus.UNLOCKED;
       this.emit('unlocked', this);
       // if autolock is on, then emit locked event after the timeout has passed
+      if (this.autoLockTimer) {
+        clearTimeout(this.autoLockTimer);
+        this.autoLockTimer = undefined;
+      }
       if (this.autoLockTime > 0) {
-        setTimeout(() => {
+        this.autoLockTimer = setTimeout(() => {
+          this.autoLockTimer = undefined;
           this.lockedStatus = LockedStatus.LOCKED;
           this.emit('locked', this);
         }, this.autoLockTime * 1000);
@@ -853,6 +873,8 @@ export class TTLock extends TTLockApi implements TTLock {
         log('========= delete passage mode');
         await this.setPassageModeCommand(data, PassageModeOperate.DELETE);
         log('========= delete passage mode');
+      } else {
+        return false;
       }
     } catch (error) {
       log.error('Error while deleting passage mode', error);
@@ -1852,6 +1874,10 @@ export class TTLock extends TTLockApi implements TTLock {
     this.connected = false;
     this.adminAuth = false;
     this.connecting = false;
+    if (this.autoLockTimer) {
+      clearTimeout(this.autoLockTimer);
+      this.autoLockTimer = undefined;
+    }
     this.emit('disconnected', this);
   }
 

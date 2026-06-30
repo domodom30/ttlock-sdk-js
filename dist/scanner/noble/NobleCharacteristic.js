@@ -15,7 +15,19 @@ class NobleCharacteristic extends events_1.EventEmitter {
         this.name = characteristic.name;
         this.type = characteristic.type;
         this.properties = characteristic.properties;
-        this.characteristic.on("read", this.onRead.bind(this));
+        this.onReadBound = this.onRead.bind(this);
+        this.characteristic.on("read", this.onReadBound);
+    }
+    /**
+     * Detach the listener on the underlying noble characteristic and drop our own
+     * subscribers. Without this every (re)connect's freshly discovered
+     * characteristics pile a new "read" listener on the persistent noble object.
+     */
+    dispose() {
+        this.characteristic.removeListener("read", this.onReadBound);
+        this.descriptors.forEach((descriptor) => descriptor.dispose());
+        this.descriptors = new Map();
+        this.removeAllListeners();
     }
     getUUID() {
         if (this.uuid.length > 4) {

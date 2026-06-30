@@ -134,20 +134,27 @@ class TTLock extends TTLockApi_1.TTLockApi {
         }
         this.connecting = true;
         this.skipDataRead = skipDataRead;
-        const connected = await this.device.connect();
-        let timeoutCycles = timeout * 10;
-        if (connected) {
-            log('Lock waiting for connection to be completed');
-            do {
-                await (0, timingUtil_1.sleep)(100);
-                timeoutCycles--;
-            } while (!this.connected && timeoutCycles > 0 && this.connecting);
+        // try/finally so a throw from device.connect() (or the wait loop) still
+        // clears `connecting`; otherwise it stays true and every later connect()
+        // is permanently rejected by the guard above.
+        try {
+            const connected = await this.device.connect();
+            let timeoutCycles = timeout * 10;
+            if (connected) {
+                log('Lock waiting for connection to be completed');
+                do {
+                    await (0, timingUtil_1.sleep)(100);
+                    timeoutCycles--;
+                } while (!this.connected && timeoutCycles > 0 && this.connecting);
+            }
+            else {
+                log('Lock connect failed');
+            }
         }
-        else {
-            log('Lock connect failed');
+        finally {
+            this.skipDataRead = false;
+            this.connecting = false;
         }
-        this.skipDataRead = false;
-        this.connecting = false;
         // it is possible that even tho device initially connected, reading initial data will disconnect
         return this.connected;
     }
@@ -376,6 +383,11 @@ class TTLock extends TTLockApi_1.TTLockApi {
             log('========= lock');
             const lockData = await this.lockCommand(psFromLock);
             log('========= lock', lockData);
+            // A manual lock supersedes any pending auto-lock timer.
+            if (this.autoLockTimer) {
+                clearTimeout(this.autoLockTimer);
+                this.autoLockTimer = undefined;
+            }
             this.lockedStatus = LockedStatus_1.LockedStatus.LOCKED;
             this.emit('locked', this);
         }
@@ -403,8 +415,13 @@ class TTLock extends TTLockApi_1.TTLockApi {
             this.lockedStatus = LockedStatus_1.LockedStatus.UNLOCKED;
             this.emit('unlocked', this);
             // if autolock is on, then emit locked event after the timeout has passed
+            if (this.autoLockTimer) {
+                clearTimeout(this.autoLockTimer);
+                this.autoLockTimer = undefined;
+            }
             if (this.autoLockTime > 0) {
-                setTimeout(() => {
+                this.autoLockTimer = setTimeout(() => {
+                    this.autoLockTimer = undefined;
                     this.lockedStatus = LockedStatus_1.LockedStatus.LOCKED;
                     this.emit('locked', this);
                 }, this.autoLockTime * 1000);
@@ -758,6 +775,9 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 log('========= delete passage mode');
                 await this.setPassageModeCommand(data, PassageModeOperate_1.PassageModeOperate.DELETE);
                 log('========= delete passage mode');
+            }
+            else {
+                return false;
             }
         }
         catch (error) {
@@ -1687,6 +1707,10 @@ class TTLock extends TTLockApi_1.TTLockApi {
         this.connected = false;
         this.adminAuth = false;
         this.connecting = false;
+        if (this.autoLockTimer) {
+            clearTimeout(this.autoLockTimer);
+            this.autoLockTimer = undefined;
+        }
         this.emit('disconnected', this);
     }
     async onTTDeviceUpdated() {

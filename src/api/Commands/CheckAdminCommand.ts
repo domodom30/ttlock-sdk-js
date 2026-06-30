@@ -17,8 +17,12 @@ export class CheckAdminCommand extends Command {
   build(): Buffer {
     if (typeof this.adminPs != "undefined") {
       const data = Buffer.alloc(11);
-      data.writeUInt32BE(this.lockFlagPos, 3); // 4 bytes (first one overlaps with adminPs)
-      data.writeUInt32BE(this.adminPs, 0); // 4 bytes
+      // lockFlagPos (4 bytes at offset 3) is written first, then adminPs (4 bytes
+      // at offset 0) overwrites byte 3 with its last byte. Correct only because
+      // lockFlagPos is always 0 here, so bytes 4-6 stay zero; a non-zero value
+      // would have its high byte clobbered by adminPs.
+      data.writeUInt32BE(this.lockFlagPos, 3);
+      data.writeUInt32BE(this.adminPs, 0);
       data.writeUInt32BE(this.uid, 7);
       return data;
     } else {

@@ -12,7 +12,11 @@ class CheckUserTimeCommand extends Command_1.Command {
         if (typeof this.uid != "undefined" && this.startDate && this.endDate && typeof this.lockFlagPos != "undefined") {
             const data = Buffer.alloc(17); //5+5+3+4
             (0, timeUtil_1.dateTimeToBuffer)(this.startDate).copy(data, 0);
-            data.writeUInt32BE(this.lockFlagPos, 9); // overlap first byte
+            // lockFlagPos (4 bytes) is written at offset 9 first, then endDate (5 bytes
+            // at offset 5) overwrites byte 9 with its last byte. This yields the intended
+            // frame only because lockFlagPos is always 0 here (see TTLockApi.checkUserTime),
+            // leaving bytes 10-12 zero; a non-zero value would be partially clobbered.
+            data.writeUInt32BE(this.lockFlagPos, 9);
             (0, timeUtil_1.dateTimeToBuffer)(this.endDate).copy(data, 5);
             data.writeUInt32BE(this.uid, 13);
             return data;

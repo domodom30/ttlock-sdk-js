@@ -11,7 +11,12 @@ class NobleDescriptor extends events_1.EventEmitter {
         this.uuid = descriptor.uuid;
         this.name = descriptor.name;
         this.type = descriptor.type;
-        this.descriptor.on("valueRead", this.onRead.bind(this));
+        this.onReadBound = this.onRead.bind(this);
+        this.descriptor.on("valueRead", this.onReadBound);
+    }
+    dispose() {
+        this.descriptor.removeListener("valueRead", this.onReadBound);
+        this.removeAllListeners();
     }
     async readValue() {
         this.device.checkBusy();
@@ -45,7 +50,6 @@ class NobleDescriptor extends events_1.EventEmitter {
         // we are only interested in data pushed by the device
         if (!this.isReading) {
             this.lastValue = data;
-            console.log("Descriptor received data", data);
             this.emit("valueRead", this.lastValue);
         }
     }

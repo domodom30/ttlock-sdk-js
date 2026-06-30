@@ -10,8 +10,9 @@ export class CodecUtils {
     if (key) {
       seed = key;
     } else {
-      // generate a random number from 1 to 127
-      seed = Math.round(Math.random() * 126) + 1;
+      // generate a random number from 1 to 127 (Math.floor keeps a uniform
+      // distribution; Math.round under-weighted the 1 and 127 endpoints)
+      seed = Math.floor(Math.random() * 127) + 1;
     }
 
     var encoded = [];
@@ -32,17 +33,24 @@ export class CodecUtils {
   }
 
   static decodeWithEncrypt(p0: Buffer, key?: number): Buffer {
+    if (p0.length == 0) {
+      return Buffer.from([]);
+    }
     var seed;
     if (key) {
       seed = key;
     } else {
-      seed = p0.readInt8(p0.length - 1);
+      seed = p0.readUInt8(p0.length - 1);
     }
 
+    // Length of the actual payload: with no key the last byte is the appended
+    // seed and is not part of the data. The CRC must be indexed on this payload
+    // length to match encodeWithEncrypt (which uses the pre-seed length).
+    const dataLength = p0.length - (key ? 0 : 1);
     var decoded = [];
-    const crc = dscrc_table[p0.length & 0xff];
+    const crc = dscrc_table[dataLength & 0xff];
 
-    for (var i = 0; i < p0.length - (key ? 0 : 1); i++) {
+    for (var i = 0; i < dataLength; i++) {
       decoded.push(seed ^ p0[i] ^ crc);
     }
 

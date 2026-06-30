@@ -46,12 +46,12 @@ export class CommandEnvelope {
       }
       command.sub_version = rawData.readInt8(3);
       command.scene = rawData.readInt8(4);
-      command.organization = rawData.readInt16BE(5); // or readInt16LE ?
-      command.sub_organization = rawData.readInt16BE(7);
+      command.organization = rawData.readUInt16BE(5);
+      command.sub_organization = rawData.readUInt16BE(7);
       command.commandType = rawData.readUInt8(9);
       command.encrypt = rawData.readInt8(10);
-      const length = rawData.readInt8(11);
-      if (length < 0 || rawData.length < 12 + length + 1) {
+      const length = rawData.readUInt8(11);
+      if (rawData.length < 12 + length + 1) {
         // header + data + crc
         throw new Error('Invalid data length');
       }
@@ -63,14 +63,14 @@ export class CommandEnvelope {
     } else {
       command.commandType = rawData.readUInt8(3);
       command.encrypt = rawData.readInt8(4);
-      const length = rawData.readInt8(5);
-      if (length < 0 || rawData.length < 6 + length + 1) {
+      const length = rawData.readUInt8(5);
+      if (rawData.length < 6 + length + 1) {
         throw new Error('Invalid data length');
       }
       command.data = rawData.subarray(6, 6 + length);
     }
     // check CRC
-    const crc = CodecUtils.crccompute(rawData.slice(0, rawData.length - 1));
+    const crc = CodecUtils.crccompute(rawData.subarray(0, rawData.length - 1));
     command.crc = rawData.readUInt8(rawData.length - 1);
     if (command.crc != crc) {
       log('Bad CRC should be ' + crc + ' and we got ' + command.crc);
@@ -196,10 +196,9 @@ export class CommandEnvelope {
       throw new Error('AES key has not been set');
     }
 
-    const org = new ArrayBuffer(4);
-    const dataView = new DataView(org);
-    dataView.setInt16(0, this.organization, false); // Bin Endian
-    dataView.setInt16(2, this.sub_organization, false); // Bin Endian
+    const org = Buffer.alloc(4);
+    org.writeUInt16BE(this.organization & 0xffff, 0); // Big Endian
+    org.writeUInt16BE(this.sub_organization & 0xffff, 2); // Big Endian
 
     let encryptedData: Buffer;
     // if there is no data we don't need to encrypt it
@@ -209,7 +208,12 @@ export class CommandEnvelope {
       encryptedData = data;
     }
 
-    let command = Buffer.concat([this.header, Buffer.from([this.protocol_type, this.sub_version, this.scene]), Buffer.from(org), Buffer.from([this.commandType, this.encrypt, encryptedData.length]), encryptedData]);
+    // The length is written into a single byte; guard against silent truncation.
+    if (encryptedData.length > 255) {
+      throw new Error('Command data too long: ' + encryptedData.length + ' bytes');
+    }
+
+    let command = Buffer.concat([this.header, Buffer.from([this.protocol_type, this.sub_version, this.scene]), org, Buffer.from([this.commandType, this.encrypt, encryptedData.length]), encryptedData]);
 
     const crc = CodecUtils.crccompute(command);
     command = Buffer.concat([command, Buffer.from([crc])]);
@@ -241,7 +245,7 @@ export class CommandEnvelope {
   }
 
   clearLockData() {
-    this.lockType = 0;
+    this.lockType = LockType.UNKNOWN;
     this.protocol_type = 0;
     this.sub_version = 0;
     this.scene = 0;

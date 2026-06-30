@@ -91,7 +91,10 @@ class ManageICCommand extends Command_1.Command {
                         if (this.cardNumber && this.startDate && this.endDate) {
                             let data;
                             let index = 0;
-                            if (this.cardNumber.length > 10) {
+                            // Decide the field width from the numeric value, not the string
+                            // length: a 10-digit number can exceed 0xFFFFFFFF, and
+                            // writeUInt32BE would throw RangeError on it.
+                            if (BigInt(this.cardNumber) > BigInt(0xFFFFFFFF)) {
                                 data = Buffer.alloc(19);
                                 data.writeBigUInt64BE(BigInt(this.cardNumber), 1);
                                 index = 9;
@@ -111,10 +114,11 @@ class ManageICCommand extends Command_1.Command {
                     return Buffer.from([this.opType]);
                 case ICOperate_1.ICOperate.DELETE:
                     if (this.cardNumber) {
-                        if (this.cardNumber.length > 10) {
+                        if (BigInt(this.cardNumber) > BigInt(0xFFFFFFFF)) {
                             const data = Buffer.alloc(9);
                             data.writeUInt8(this.opType, 0);
                             data.writeBigUInt64BE(BigInt(this.cardNumber), 1);
+                            return data;
                         }
                         else {
                             const data = Buffer.alloc(5);

@@ -30,6 +30,10 @@ class BluetoothLeService extends events_1.EventEmitter {
     async stopScan() {
         return await this.scanner.stopScan();
     }
+    destroy() {
+        this.scanner.destroy();
+        this.removeAllListeners();
+    }
     isScanning() {
         return this.scanner.getState() == "scanning";
     }

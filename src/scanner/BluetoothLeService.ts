@@ -50,6 +50,11 @@ export class BluetoothLeService extends EventEmitter implements BluetoothLeServi
     return await this.scanner.stopScan();
   }
 
+  destroy(): void {
+    this.scanner.destroy();
+    this.removeAllListeners();
+  }
+
   isScanning(): boolean {
     return this.scanner.getState() == "scanning";
   }

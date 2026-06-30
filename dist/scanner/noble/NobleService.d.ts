@@ -12,6 +12,7 @@ export declare class NobleService implements ServiceInterface {
     private service;
     constructor(device: NobleDevice, service: Service);
     getUUID(): string;
+    dispose(): void;
     discoverCharacteristics(): Promise<Map<string, CharacteristicInterface>>;
     readCharacteristics(): Promise<Map<string, CharacteristicInterface>>;
     toJSON(asObject: boolean): string | Object;

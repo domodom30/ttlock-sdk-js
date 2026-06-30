@@ -10,7 +10,9 @@ export declare class NobleDescriptor extends EventEmitter implements DescriptorI
     lastValue?: Buffer;
     private device;
     private descriptor;
+    private readonly onReadBound;
     constructor(device: NobleDevice, descriptor: Descriptor);
+    dispose(): void;
     readValue(): Promise<Buffer | undefined>;
     writeValue(data: Buffer): Promise<void>;
     private onRead;

@@ -61,6 +61,10 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     stopBTService() {
         if (this.bleService != null) {
             this.stopScanLock();
+            // Detach the scanner's listeners (incl. those on the global noble
+            // singleton) before dropping the reference, otherwise each
+            // prepare/stop cycle leaks them.
+            this.bleService.destroy();
             this.bleService = null;
         }
         return true;

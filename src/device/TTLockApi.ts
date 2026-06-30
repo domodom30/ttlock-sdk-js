@@ -905,8 +905,10 @@ export abstract class TTLockApi extends EventEmitter {
         throw new Error('Failed unlock response');
       }
       // it is possible here that the UnlockCommand will have a bad CRC
-      // and we will read a SearchBicycleStatusCommand that is sent right after instead
-      if (typeof cmd.getBatteryCapacity != 'undefined') {
+      // and we will read a SearchBicycleStatusCommand that is sent right after instead.
+      // getBatteryCapacity is a prototype method, so `typeof` was always
+      // 'function'; check the actual command type instead.
+      if (cmd instanceof UnlockCommand) {
         this.batteryCapacity = cmd.getBatteryCapacity();
         return cmd.getUnlockData();
       } else {
@@ -950,8 +952,10 @@ export abstract class TTLockApi extends EventEmitter {
         throw new Error('Failed lock response');
       }
       // it is possible here that the LockCommand will have a bad CRC
-      // and we will read a SearchBicycleStatusCommand  that is sent right after instead
-      if (typeof cmd.getBatteryCapacity != 'undefined') {
+      // and we will read a SearchBicycleStatusCommand  that is sent right after instead.
+      // getBatteryCapacity is a prototype method, so `typeof` was always
+      // 'function'; check the actual command type instead.
+      if (cmd instanceof LockCommand) {
         this.batteryCapacity = cmd.getBatteryCapacity();
         return cmd.getUnlockData();
       } else {
@@ -1074,7 +1078,9 @@ export abstract class TTLockApi extends EventEmitter {
     const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
     requestEnvelope.setCommandType(CommandType.COMM_MANAGE_KEYBOARD_PASSWORD);
     let cmd = requestEnvelope.getCommand() as ManageKeyboardPasswordCommand;
-    cmd.addPasscode(type, passCode, startDate, endDate);
+    if (!cmd.addPasscode(type, passCode, startDate, endDate)) {
+      throw new Error('Invalid passcode (must be 4-9 digits) or invalid validity dates');
+    }
     const responseEnvelope = await this.device.sendCommand(requestEnvelope);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
@@ -1101,7 +1107,9 @@ export abstract class TTLockApi extends EventEmitter {
     const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
     requestEnvelope.setCommandType(CommandType.COMM_MANAGE_KEYBOARD_PASSWORD);
     let cmd = requestEnvelope.getCommand() as ManageKeyboardPasswordCommand;
-    cmd.recoverPasscode(type, passCode, startDate, endDate);
+    if (!cmd.recoverPasscode(type, passCode, startDate, endDate)) {
+      throw new Error('Invalid passcode (must be 4-9 digits) or invalid validity dates');
+    }
     const responseEnvelope = await this.device.sendCommand(requestEnvelope);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
@@ -1128,7 +1136,9 @@ export abstract class TTLockApi extends EventEmitter {
     const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
     requestEnvelope.setCommandType(CommandType.COMM_MANAGE_KEYBOARD_PASSWORD);
     let cmd = requestEnvelope.getCommand() as ManageKeyboardPasswordCommand;
-    cmd.updatePasscode(type, oldPassCode, newPassCode, startDate, endDate);
+    if (!cmd.updatePasscode(type, oldPassCode, newPassCode, startDate, endDate)) {
+      throw new Error('Invalid passcode (must be 4-9 digits) or invalid validity dates');
+    }
     const responseEnvelope = await this.device.sendCommand(requestEnvelope);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
@@ -1155,7 +1165,9 @@ export abstract class TTLockApi extends EventEmitter {
     const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
     requestEnvelope.setCommandType(CommandType.COMM_MANAGE_KEYBOARD_PASSWORD);
     let cmd = requestEnvelope.getCommand() as ManageKeyboardPasswordCommand;
-    cmd.deletePasscode(type, passCode);
+    if (!cmd.deletePasscode(type, passCode)) {
+      throw new Error('Invalid passcode (must be 4-9 digits)');
+    }
     const responseEnvelope = await this.device.sendCommand(requestEnvelope);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);

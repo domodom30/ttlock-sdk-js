@@ -29,6 +29,7 @@ export declare class TTLock extends TTLockApi implements TTLock {
     private connected;
     private skipDataRead;
     private connecting;
+    private autoLockTimer?;
     lastPasscodeError: PasscodeOperationError | null;
     constructor(device: TTBluetoothDevice, data?: TTLockData);
     getAddress(): string;

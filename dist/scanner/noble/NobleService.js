@@ -28,6 +28,10 @@ class NobleService {
         }
         return this.uuid;
     }
+    dispose() {
+        this.characteristics.forEach((characteristic) => characteristic.dispose());
+        this.characteristics = new Map();
+    }
     async discoverCharacteristics() {
         try {
             this.characteristics = new Map();

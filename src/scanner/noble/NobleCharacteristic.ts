@@ -17,6 +17,7 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
   descriptors: Map<string, NobleDescriptor> = new Map();
   private device: NobleDevice;
   private characteristic: Characteristic;
+  private readonly onReadBound: (data: Buffer) => void;
 
   constructor(device: NobleDevice, characteristic: Characteristic) {
     super();
@@ -26,7 +27,20 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
     this.name = characteristic.name;
     this.type = characteristic.type;
     this.properties = characteristic.properties;
-    this.characteristic.on("read", this.onRead.bind(this));
+    this.onReadBound = this.onRead.bind(this);
+    this.characteristic.on("read", this.onReadBound);
+  }
+
+  /**
+   * Detach the listener on the underlying noble characteristic and drop our own
+   * subscribers. Without this every (re)connect's freshly discovered
+   * characteristics pile a new "read" listener on the persistent noble object.
+   */
+  dispose(): void {
+    this.characteristic.removeListener("read", this.onReadBound);
+    this.descriptors.forEach((descriptor) => descriptor.dispose());
+    this.descriptors = new Map();
+    this.removeAllListeners();
   }
 
   getUUID(): string {

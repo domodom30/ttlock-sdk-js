@@ -41,6 +41,11 @@ export class NobleService implements ServiceInterface {
     return this.uuid;
   }
 
+  dispose(): void {
+    this.characteristics.forEach((characteristic) => characteristic.dispose());
+    this.characteristics = new Map();
+  }
+
   async discoverCharacteristics(): Promise<Map<string, CharacteristicInterface>> {
     try {
       this.characteristics = new Map();

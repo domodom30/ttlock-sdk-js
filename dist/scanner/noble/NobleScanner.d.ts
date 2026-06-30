@@ -8,9 +8,14 @@ export declare class NobleScanner extends EventEmitter implements ScannerInterfa
     private nobleState;
     private devices;
     protected noble?: typeof nobleObj;
+    private readonly onDiscoverBound;
+    private readonly onStateChangeBound;
+    private readonly onScanStartBound;
+    private readonly onScanStopBound;
     constructor(uuids?: string[]);
     protected createNoble(): void;
     protected initNoble(): void;
+    destroy(): void;
     getState(): ScannerStateType;
     startScan(passive: boolean): Promise<boolean>;
     stopScan(): Promise<boolean>;

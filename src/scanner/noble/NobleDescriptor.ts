@@ -13,6 +13,7 @@ export class NobleDescriptor extends EventEmitter implements DescriptorInterface
   lastValue?: Buffer;
   private device: NobleDevice;
   private descriptor: Descriptor;
+  private readonly onReadBound: (data: Buffer) => void;
 
   constructor(device: NobleDevice, descriptor: Descriptor) {
     super();
@@ -21,7 +22,13 @@ export class NobleDescriptor extends EventEmitter implements DescriptorInterface
     this.uuid = descriptor.uuid;
     this.name = descriptor.name;
     this.type = descriptor.type;
-    this.descriptor.on("valueRead", this.onRead.bind(this));
+    this.onReadBound = this.onRead.bind(this);
+    this.descriptor.on("valueRead", this.onReadBound);
+  }
+
+  dispose(): void {
+    this.descriptor.removeListener("valueRead", this.onReadBound);
+    this.removeAllListeners();
   }
 
   async readValue(): Promise<Buffer | undefined> {
@@ -59,7 +66,6 @@ export class NobleDescriptor extends EventEmitter implements DescriptorInterface
     // we are only interested in data pushed by the device
     if (!this.isReading) {
       this.lastValue = data;
-      console.log("Descriptor received data", data);
       this.emit("valueRead", this.lastValue);
     }
   }

@@ -15,11 +15,20 @@ class OperationLogCommand extends Command_1.Command {
             if (totalLen > 0) {
                 this.sequence = this.commandData.readUInt16BE(2);
                 let index = 4;
+                // A page can carry several records, but the firmware only reports one
+                // `sequence` (the pointer for the next page). The records in this page
+                // occupy the numbers `sequence-1, sequence-2, ...` because the next
+                // page's sequence advances by exactly the number of records consumed
+                // here (the pagination invariant, in both newest→oldest and forward
+                // sweeps). Without this per-record offset every record in the page got
+                // the same `recordNumber` and all but the last were overwritten in the
+                // record-number-indexed cache of getOperationLog().
+                let recordIndex = 0;
                 while (index < this.commandData.length) {
                     const recLen = this.commandData.readUInt8(index++);
                     const recStart = index;
                     let log = {
-                        recordNumber: this.sequence - 1,
+                        recordNumber: this.sequence - 1 - recordIndex,
                         recordType: this.commandData.readUInt8(index++),
                         operateDate: '20' +
                             this.commandData.readUInt8(index++).toString().padStart(2, '0') + // year
@@ -157,6 +166,7 @@ class OperationLogCommand extends Command_1.Command {
                     // with extra fields added in future firmware versions.
                     index = recStart + recLen;
                     this.logs.push(log);
+                    recordIndex++;
                 }
             }
         }

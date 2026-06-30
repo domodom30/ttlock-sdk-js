@@ -13,7 +13,14 @@ export declare class NobleCharacteristic extends EventEmitter implements Charact
     descriptors: Map<string, NobleDescriptor>;
     private device;
     private characteristic;
+    private readonly onReadBound;
     constructor(device: NobleDevice, characteristic: Characteristic);
+    /**
+     * Detach the listener on the underlying noble characteristic and drop our own
+     * subscribers. Without this every (re)connect's freshly discovered
+     * characteristics pile a new "read" listener on the persistent noble object.
+     */
+    dispose(): void;
     getUUID(): string;
     discoverDescriptors(): Promise<Map<string, DescriptorInterface>>;
     read(): Promise<Buffer | undefined>;

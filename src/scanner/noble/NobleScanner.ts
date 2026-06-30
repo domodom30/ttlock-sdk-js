@@ -16,6 +16,14 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   private nobleState: nobleStateType = 'unknown';
   private devices: Map<string, NobleDevice> = new Map();
   protected noble?: typeof nobleObj;
+  // Keep the bound handlers so they can be detached in destroy(). For the
+  // 'noble' transport `this.noble` is the global singleton, so without removal
+  // every prepare/stop cycle leaked 4 listeners on it (eventually
+  // MaxListenersExceeded + ghost handlers from dead scanner instances).
+  private readonly onDiscoverBound = this.onNobleDiscover.bind(this);
+  private readonly onStateChangeBound = this.onNobleStateChange.bind(this);
+  private readonly onScanStartBound = this.onNobleScanStart.bind(this);
+  private readonly onScanStopBound = this.onNobleScanStop.bind(this);
 
   constructor(uuids: string[] = []) {
     super();
@@ -30,11 +38,21 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
 
   protected initNoble() {
     if (typeof this.noble != 'undefined') {
-      this.noble.on('discover', this.onNobleDiscover.bind(this));
-      this.noble.on('stateChange', this.onNobleStateChange.bind(this));
-      this.noble.on('scanStart', this.onNobleScanStart.bind(this));
-      this.noble.on('scanStop', this.onNobleScanStop.bind(this));
+      this.noble.on('discover', this.onDiscoverBound);
+      this.noble.on('stateChange', this.onStateChangeBound);
+      this.noble.on('scanStart', this.onScanStartBound);
+      this.noble.on('scanStop', this.onScanStopBound);
     }
+  }
+
+  destroy(): void {
+    if (typeof this.noble != 'undefined') {
+      this.noble.removeListener('discover', this.onDiscoverBound);
+      this.noble.removeListener('stateChange', this.onStateChangeBound);
+      this.noble.removeListener('scanStart', this.onScanStartBound);
+      this.noble.removeListener('scanStop', this.onScanStopBound);
+    }
+    this.removeAllListeners();
   }
 
   getState(): ScannerStateType {

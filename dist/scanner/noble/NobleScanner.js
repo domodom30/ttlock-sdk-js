@@ -15,6 +15,14 @@ class NobleScanner extends events_1.EventEmitter {
         this.scannerState = 'unknown';
         this.nobleState = 'unknown';
         this.devices = new Map();
+        // Keep the bound handlers so they can be detached in destroy(). For the
+        // 'noble' transport `this.noble` is the global singleton, so without removal
+        // every prepare/stop cycle leaked 4 listeners on it (eventually
+        // MaxListenersExceeded + ghost handlers from dead scanner instances).
+        this.onDiscoverBound = this.onNobleDiscover.bind(this);
+        this.onStateChangeBound = this.onNobleStateChange.bind(this);
+        this.onScanStartBound = this.onNobleScanStart.bind(this);
+        this.onScanStopBound = this.onNobleScanStop.bind(this);
         this.uuids = uuids;
         this.createNoble();
         this.initNoble();
@@ -24,11 +32,20 @@ class NobleScanner extends events_1.EventEmitter {
     }
     initNoble() {
         if (typeof this.noble != 'undefined') {
-            this.noble.on('discover', this.onNobleDiscover.bind(this));
-            this.noble.on('stateChange', this.onNobleStateChange.bind(this));
-            this.noble.on('scanStart', this.onNobleScanStart.bind(this));
-            this.noble.on('scanStop', this.onNobleScanStop.bind(this));
+            this.noble.on('discover', this.onDiscoverBound);
+            this.noble.on('stateChange', this.onStateChangeBound);
+            this.noble.on('scanStart', this.onScanStartBound);
+            this.noble.on('scanStop', this.onScanStopBound);
         }
+    }
+    destroy() {
+        if (typeof this.noble != 'undefined') {
+            this.noble.removeListener('discover', this.onDiscoverBound);
+            this.noble.removeListener('stateChange', this.onStateChangeBound);
+            this.noble.removeListener('scanStart', this.onScanStartBound);
+            this.noble.removeListener('scanStop', this.onScanStopBound);
+        }
+        this.removeAllListeners();
     }
     getState() {
         return this.scannerState;

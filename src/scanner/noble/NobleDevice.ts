@@ -236,6 +236,10 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
     this.connected = false;
     this.connecting = false;
     this.resetBusy();
+    // Detach listeners on the underlying noble characteristics/descriptors
+    // before dropping the wrappers, otherwise they (and the wrappers they keep
+    // alive) accumulate across reconnections.
+    this.services.forEach((service) => service.dispose());
     this.services = new Map();
     this.emit('disconnected');
   }

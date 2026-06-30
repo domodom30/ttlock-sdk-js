@@ -15,6 +15,7 @@ export declare class BluetoothLeService extends EventEmitter implements Bluetoot
     constructor(uuids: string[] | undefined, scannerType: ScannerType | undefined, scannerOptions: ScannerOptions);
     startScan(passive?: boolean): Promise<boolean>;
     stopScan(): Promise<boolean>;
+    destroy(): void;
     isScanning(): boolean;
     forgetDevice(id: string): void;
     private onDiscover;
