@@ -1,7 +1,7 @@
-import { ScannerInterface, ScannerStateType } from '../ScannerInterface';
-import nobleObj from '@abandonware/noble';
-import { EventEmitter } from 'events';
-type nobleStateType = 'unknown' | 'resetting' | 'unsupported' | 'unauthorized' | 'poweredOff' | 'poweredOn';
+import { ScannerInterface, ScannerStateType } from "../ScannerInterface";
+import nobleObj from "@abandonware/noble";
+import { EventEmitter } from "events";
+type nobleStateType = "unknown" | "resetting" | "unsupported" | "unauthorized" | "poweredOff" | "poweredOn";
 export declare class NobleScanner extends EventEmitter implements ScannerInterface {
     uuids: string[];
     scannerState: ScannerStateType;

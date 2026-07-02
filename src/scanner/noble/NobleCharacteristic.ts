@@ -1,13 +1,19 @@
-'use strict';
+"use strict";
 
 import { Characteristic } from "@abandonware/noble";
 import { EventEmitter } from "events";
 import { sleep } from "../../util/timingUtil";
-import { CharacteristicInterface, DescriptorInterface } from "../DeviceInterface";
+import {
+  CharacteristicInterface,
+  DescriptorInterface,
+} from "../DeviceInterface";
 import { NobleDescriptor } from "./NobleDescriptor";
 import { NobleDevice } from "./NobleDevice";
 
-export class NobleCharacteristic extends EventEmitter implements CharacteristicInterface {
+export class NobleCharacteristic
+  extends EventEmitter
+  implements CharacteristicInterface
+{
   uuid: string;
   name?: string | undefined;
   type?: string | undefined;
@@ -31,11 +37,6 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
     this.characteristic.on("read", this.onReadBound);
   }
 
-  /**
-   * Detach the listener on the underlying noble characteristic and drop our own
-   * subscribers. Without this every (re)connect's freshly discovered
-   * characteristics pile a new "read" listener on the persistent noble object.
-   */
   dispose(): void {
     this.characteristic.removeListener("read", this.onReadBound);
     this.descriptors.forEach((descriptor) => descriptor.dispose());
@@ -45,7 +46,9 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
 
   getUUID(): string {
     if (this.uuid.length > 4) {
-      return this.uuid.replace("-0000-1000-8000-00805f9b34fb", "").replace("0000", "");
+      return this.uuid
+        .replace("-0000-1000-8000-00805f9b34fb", "")
+        .replace("0000", "");
     }
     return this.uuid;
   }
@@ -60,7 +63,10 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
       const descriptors = await this.characteristic.discoverDescriptorsAsync();
       this.descriptors = new Map();
       descriptors.forEach((descriptor) => {
-        this.descriptors.set(descriptor.uuid, new NobleDescriptor(this.device, descriptor));
+        this.descriptors.set(
+          descriptor.uuid,
+          new NobleDescriptor(this.device, descriptor),
+        );
       });
     } catch (error) {
       console.error(error);
@@ -90,7 +96,10 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
   }
 
   async write(data: Buffer, withoutResponse: boolean): Promise<boolean> {
-    if (!this.properties.includes("write") && !this.properties.includes("writeWithoutResponse")) {
+    if (
+      !this.properties.includes("write") &&
+      !this.properties.includes("writeWithoutResponse")
+    ) {
       return false;
     }
     this.device.checkBusy();
@@ -104,7 +113,6 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
     let writeError = false;
     let counter = 5000;
 
-    // await this.characteristic.writeAsync(data, withoutResponse);
     this.characteristic.write(data, withoutResponse, (error) => {
       if (error) {
         writeError = true;
@@ -122,12 +130,9 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
 
   async subscribe(): Promise<void> {
     await this.characteristic.subscribeAsync();
-    // await this.characteristic.notifyAsync(true);
   }
 
   private onRead(data: Buffer) {
-    // if the read notification comes from a manual read, just ignore it
-    // we are only interested in data pushed by the device
     if (!this.isReading) {
       this.lastValue = data;
       this.emit("dataRead", this.lastValue);
@@ -141,8 +146,8 @@ export class NobleCharacteristic extends EventEmitter implements CharacteristicI
       type: this.type,
       properties: this.properties,
       value: this.lastValue?.toString("hex"),
-      descriptors: {}
-    }
+      descriptors: {},
+    };
     this.descriptors.forEach((descriptor) => {
       json.descriptors[this.uuid] = this.toJSON(true);
     });

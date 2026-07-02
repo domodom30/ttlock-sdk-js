@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createLogger = createLogger;
 function parseFilters() {
@@ -8,9 +8,9 @@ function parseFilters() {
     }
     return raw
         .split(",")
-        .map(s => s.trim())
-        .filter(s => s.length > 0)
-        .map(pattern => {
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .map((pattern) => {
         const escaped = pattern
             .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
             .replace(/\*/g, ".*");
@@ -34,10 +34,11 @@ function createLogger(namespace) {
     const enabled = isEnabled(namespace);
     const log = enabled
         ? (...args) => console.log(`[${namespace}]`, ...args)
-        : () => { };
+        : () => {
+            /* noop */
+        };
     const logger = log;
     logger.enabled = enabled;
-    // Errors and warnings always print regardless of namespace filtering.
     logger.error = (...args) => console.error(`[${namespace}]`, ...args);
     logger.warn = (...args) => console.warn(`[${namespace}]`, ...args);
     return logger;

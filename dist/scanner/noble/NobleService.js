@@ -1,9 +1,9 @@
-'use strict';
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NobleService = void 0;
 const NobleCharacteristic_1 = require("./NobleCharacteristic");
 const logger_1 = require("../../util/logger");
-const log = (0, logger_1.createLogger)('ttlock:scanner');
+const log = (0, logger_1.createLogger)("ttlock:scanner");
 class NobleService {
     constructor(device, service) {
         this.characteristics = new Map();
@@ -13,7 +13,6 @@ class NobleService {
         this.name = service.name;
         this.type = service.type;
         this.includedServiceUuids = service.includedServiceUuids;
-        // also add characteristics if they exist
         if (service.characteristics && service.characteristics.length > 0) {
             this.characteristics = new Map();
             service.characteristics.forEach((characteristic) => {
@@ -24,7 +23,9 @@ class NobleService {
     }
     getUUID() {
         if (this.uuid.length > 4) {
-            return this.uuid.replace('-0000-1000-8000-00805f9b34fb', '').replace('0000', '');
+            return this.uuid
+                .replace("-0000-1000-8000-00805f9b34fb", "")
+                .replace("0000", "");
         }
         return this.uuid;
     }
@@ -55,7 +56,15 @@ class NobleService {
             await this.discoverCharacteristics();
         }
         for (let [uuid, characteristic] of this.characteristics) {
-            await characteristic.read();
+            if (!this.device.connected) {
+                break;
+            }
+            try {
+                await characteristic.read();
+            }
+            catch (error) {
+                log.warn(error);
+            }
         }
         return this.characteristics;
     }
@@ -64,7 +73,7 @@ class NobleService {
             uuid: this.uuid,
             name: this.name,
             type: this.type,
-            characteristics: {}
+            characteristics: {},
         };
         this.characteristics.forEach((characteristic) => {
             json.characteristics[characteristic.uuid] = characteristic.toJSON(true);

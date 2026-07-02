@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NobleCharacteristic = void 0;
 const events_1 = require("events");
@@ -18,11 +18,6 @@ class NobleCharacteristic extends events_1.EventEmitter {
         this.onReadBound = this.onRead.bind(this);
         this.characteristic.on("read", this.onReadBound);
     }
-    /**
-     * Detach the listener on the underlying noble characteristic and drop our own
-     * subscribers. Without this every (re)connect's freshly discovered
-     * characteristics pile a new "read" listener on the persistent noble object.
-     */
     dispose() {
         this.characteristic.removeListener("read", this.onReadBound);
         this.descriptors.forEach((descriptor) => descriptor.dispose());
@@ -31,7 +26,9 @@ class NobleCharacteristic extends events_1.EventEmitter {
     }
     getUUID() {
         if (this.uuid.length > 4) {
-            return this.uuid.replace("-0000-1000-8000-00805f9b34fb", "").replace("0000", "");
+            return this.uuid
+                .replace("-0000-1000-8000-00805f9b34fb", "")
+                .replace("0000", "");
         }
         return this.uuid;
     }
@@ -75,7 +72,8 @@ class NobleCharacteristic extends events_1.EventEmitter {
         return this.lastValue;
     }
     async write(data, withoutResponse) {
-        if (!this.properties.includes("write") && !this.properties.includes("writeWithoutResponse")) {
+        if (!this.properties.includes("write") &&
+            !this.properties.includes("writeWithoutResponse")) {
             return false;
         }
         this.device.checkBusy();
@@ -87,7 +85,6 @@ class NobleCharacteristic extends events_1.EventEmitter {
         let written = false;
         let writeError = false;
         let counter = 5000;
-        // await this.characteristic.writeAsync(data, withoutResponse);
         this.characteristic.write(data, withoutResponse, (error) => {
             if (error) {
                 writeError = true;
@@ -103,11 +100,8 @@ class NobleCharacteristic extends events_1.EventEmitter {
     }
     async subscribe() {
         await this.characteristic.subscribeAsync();
-        // await this.characteristic.notifyAsync(true);
     }
     onRead(data) {
-        // if the read notification comes from a manual read, just ignore it
-        // we are only interested in data pushed by the device
         if (!this.isReading) {
             this.lastValue = data;
             this.emit("dataRead", this.lastValue);
@@ -121,7 +115,7 @@ class NobleCharacteristic extends events_1.EventEmitter {
             type: this.type,
             properties: this.properties,
             value: (_a = this.lastValue) === null || _a === void 0 ? void 0 : _a.toString("hex"),
-            descriptors: {}
+            descriptors: {},
         };
         this.descriptors.forEach((descriptor) => {
             json.descriptors[this.uuid] = this.toJSON(true);

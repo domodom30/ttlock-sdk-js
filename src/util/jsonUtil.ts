@@ -1,24 +1,16 @@
-'use strict';
+"use strict";
 
-/**
- * Recursively converts all buffers to hex string in an object
- * @param json Object to convert Buffers to string
- */
 export function stringifyBuffers(json: Object): Object {
-  // Primitives (incl. null) are returned as-is. Guarding null here is what
-  // prevents `Object.getOwnPropertyNames(null)` from throwing on a nested null.
   if (json === null || typeof json !== "object") {
     return json;
   }
-  if ((json instanceof Set) || (json instanceof Map)) {
+  if (json instanceof Set || json instanceof Map) {
     return json;
   }
   if (json instanceof Buffer) {
-    return json.toString('hex');
+    return json.toString("hex");
   }
-  // Produce a copy instead of mutating the input: callers often keep using the
-  // original object after logging it, and replacing its Buffers with hex strings
-  // in place would corrupt it.
+
   const result: any = Array.isArray(json) ? [] : {};
   Object.getOwnPropertyNames(json).forEach((key) => {
     const val = Reflect.get(json, key);

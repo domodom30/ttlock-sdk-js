@@ -1,6 +1,6 @@
 export { TTLockClient } from "./TTLockClient";
 export { TTLock } from "./device/TTLock";
-export { NoMoreOperationDataError, PasscodeOperationError, PasscodeOperation, LockFirmwareError, LockFirmwareOperation } from "./device/TTLockApi";
+export { NoMoreOperationDataError, PasscodeOperationError, PasscodeOperation, LockFirmwareError, LockFirmwareOperation, } from "./device/TTLockApi";
 export { TTLockData } from "./store/TTLockData";
 export { ValidityInfo } from "./api/ValidityInfo";
 export { PassageModeData, KeyboardPassCode, ICCard } from "./api/Commands";

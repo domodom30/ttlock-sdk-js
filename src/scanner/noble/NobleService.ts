@@ -1,12 +1,12 @@
-'use strict';
+"use strict";
 
-import { Service } from '@abandonware/noble';
-import { CharacteristicInterface, ServiceInterface } from '../DeviceInterface';
-import { NobleCharacteristic } from './NobleCharacteristic';
-import { NobleDevice } from './NobleDevice';
-import { createLogger } from '../../util/logger';
+import { Service } from "@abandonware/noble";
+import { CharacteristicInterface, ServiceInterface } from "../DeviceInterface";
+import { NobleCharacteristic } from "./NobleCharacteristic";
+import { NobleDevice } from "./NobleDevice";
+import { createLogger } from "../../util/logger";
 
-const log = createLogger('ttlock:scanner');
+const log = createLogger("ttlock:scanner");
 
 export class NobleService implements ServiceInterface {
   uuid: string;
@@ -24,7 +24,7 @@ export class NobleService implements ServiceInterface {
     this.name = service.name;
     this.type = service.type;
     this.includedServiceUuids = service.includedServiceUuids;
-    // also add characteristics if they exist
+
     if (service.characteristics && service.characteristics.length > 0) {
       this.characteristics = new Map();
       service.characteristics.forEach((characteristic) => {
@@ -36,7 +36,9 @@ export class NobleService implements ServiceInterface {
 
   getUUID(): string {
     if (this.uuid.length > 4) {
-      return this.uuid.replace('-0000-1000-8000-00805f9b34fb', '').replace('0000', '');
+      return this.uuid
+        .replace("-0000-1000-8000-00805f9b34fb", "")
+        .replace("0000", "");
     }
     return this.uuid;
   }
@@ -46,7 +48,9 @@ export class NobleService implements ServiceInterface {
     this.characteristics = new Map();
   }
 
-  async discoverCharacteristics(): Promise<Map<string, CharacteristicInterface>> {
+  async discoverCharacteristics(): Promise<
+    Map<string, CharacteristicInterface>
+  > {
     try {
       this.characteristics = new Map();
       this.device.checkBusy();
@@ -70,7 +74,14 @@ export class NobleService implements ServiceInterface {
     }
 
     for (let [uuid, characteristic] of this.characteristics) {
-      await characteristic.read();
+      if (!this.device.connected) {
+        break;
+      }
+      try {
+        await characteristic.read();
+      } catch (error) {
+        log.warn(error);
+      }
     }
 
     return this.characteristics;
@@ -81,7 +92,7 @@ export class NobleService implements ServiceInterface {
       uuid: this.uuid,
       name: this.name,
       type: this.type,
-      characteristics: {}
+      characteristics: {},
     };
     this.characteristics.forEach((characteristic) => {
       json.characteristics[characteristic.uuid] = characteristic.toJSON(true);

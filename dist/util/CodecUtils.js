@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CodecUtils = void 0;
 /** TODO: use Buffers */
@@ -10,8 +10,6 @@ class CodecUtils {
             seed = key;
         }
         else {
-            // generate a random number from 1 to 127 (Math.floor keeps a uniform
-            // distribution; Math.round under-weighted the 1 and 127 endpoints)
             seed = Math.floor(Math.random() * 127) + 1;
         }
         var encoded = [];
@@ -38,9 +36,6 @@ class CodecUtils {
         else {
             seed = p0.readUInt8(p0.length - 1);
         }
-        // Length of the actual payload: with no key the last byte is the appended
-        // seed and is not part of the data. The CRC must be indexed on this payload
-        // length to match encodeWithEncrypt (which uses the pre-seed length).
         const dataLength = p0.length - (key ? 0 : 1);
         var decoded = [];
         const crc = dscrc_table_1.dscrc_table[dataLength & 0xff];

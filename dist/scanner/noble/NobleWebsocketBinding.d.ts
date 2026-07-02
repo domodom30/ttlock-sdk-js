@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from "events";
 export declare class NobleWebsocketBinding extends EventEmitter {
     private ws;
     private auth;

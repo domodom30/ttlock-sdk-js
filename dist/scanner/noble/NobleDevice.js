@@ -1,11 +1,11 @@
-'use strict';
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NobleDevice = void 0;
 const events_1 = require("events");
 const NobleService_1 = require("./NobleService");
 const timingUtil_1 = require("../../util/timingUtil");
 const logger_1 = require("../../util/logger");
-const log = (0, logger_1.createLogger)('ttlock:scanner');
+const log = (0, logger_1.createLogger)("ttlock:scanner");
 class NobleDevice extends events_1.EventEmitter {
     constructor(peripheral) {
         super();
@@ -17,28 +17,26 @@ class NobleDevice extends events_1.EventEmitter {
         this.id = peripheral.id;
         this.uuid = peripheral.uuid;
         this.name = peripheral.advertisement.localName;
-        this.address = peripheral.address.replace(/\-/g, ':').toUpperCase();
+        this.address = peripheral.address.replace(/\-/g, ":").toUpperCase();
         this.addressType = peripheral.addressType;
         this.connectable = peripheral.connectable;
         this.rssi = peripheral.rssi;
-        // this.mtu = peripheral.mtu;
         if (peripheral.advertisement.manufacturerData) {
             this.manufacturerData = peripheral.advertisement.manufacturerData;
         }
         else {
             this.manufacturerData = Buffer.from([]);
         }
-        this.peripheral.on('connect', this.onConnect.bind(this));
-        this.peripheral.on('disconnect', this.onDisconnect.bind(this));
+        this.peripheral.on("connect", this.onConnect.bind(this));
+        this.peripheral.on("disconnect", this.onDisconnect.bind(this));
         this.services = new Map();
     }
     updateFromPeripheral() {
         this.name = this.peripheral.advertisement.localName;
-        this.address = this.peripheral.address.replace(/\-/g, ':').toUpperCase();
+        this.address = this.peripheral.address.replace(/\-/g, ":").toUpperCase();
         this.addressType = this.peripheral.addressType;
         this.connectable = this.peripheral.connectable;
         this.rssi = this.peripheral.rssi;
-        // this.mtu = peripheral.mtu;
         if (this.peripheral.advertisement.manufacturerData) {
             this.manufacturerData = this.peripheral.advertisement.manufacturerData;
         }
@@ -48,7 +46,7 @@ class NobleDevice extends events_1.EventEmitter {
     }
     checkBusy() {
         if (this.busy) {
-            throw new Error('NobleDevice is busy');
+            throw new Error("NobleDevice is busy");
         }
         else {
             this.busy = true;
@@ -63,19 +61,19 @@ class NobleDevice extends events_1.EventEmitter {
     }
     async connect(timeout = 10) {
         if (this.connectable && !this.connected && !this.connecting) {
-            if (this.peripheral.state == 'connected') {
+            if (this.peripheral.state == "connected") {
                 this.connected = true;
                 return true;
             }
             this.connecting = true;
-            log('Peripheral connect start');
+            log("Peripheral connect start");
             this.peripheral.connect((error) => {
-                if (typeof error != 'undefined' && error != null) {
-                    log('Peripheral connect error:', error);
+                if (typeof error != "undefined" && error != null) {
+                    log("Peripheral connect error:", error);
                 }
                 else {
-                    log('Peripheral state:', this.peripheral.state);
-                    if (this.peripheral.state == 'connected') {
+                    log("Peripheral state:", this.peripheral.state);
+                    if (this.peripheral.state == "connected") {
                         this.connected = true;
                         this.connecting = false;
                     }
@@ -95,11 +93,11 @@ class NobleDevice extends events_1.EventEmitter {
                 catch (error) { }
                 return false;
             }
-            log('Device emiting connected');
-            this.emit('connected');
+            log("Device emiting connected");
+            this.emit("connected");
             return true;
         }
-        log('Peripheral state:', this.peripheral.state);
+        log("Peripheral state:", this.peripheral.state);
         return false;
     }
     async disconnect() {
@@ -123,7 +121,7 @@ class NobleDevice extends events_1.EventEmitter {
             this.checkBusy();
             if (!this.connected) {
                 this.resetBusy();
-                throw new Error('NobleDevice not connected');
+                throw new Error("NobleDevice not connected");
             }
             const snc = await this.peripheral.discoverAllServicesAndCharacteristicsAsync();
             this.resetBusy();
@@ -148,7 +146,7 @@ class NobleDevice extends events_1.EventEmitter {
             this.checkBusy();
             if (!this.connected) {
                 this.resetBusy();
-                throw new Error('NobleDevice not connected');
+                throw new Error("NobleDevice not connected");
             }
             let timeoutCycles = 10 * 100;
             let services = [];
@@ -160,7 +158,6 @@ class NobleDevice extends events_1.EventEmitter {
                 await (0, timingUtil_1.sleep)(10);
                 timeoutCycles--;
             } while (services.length == 0 && timeoutCycles > 0 && this.connected);
-            // const services = await this.peripheral.discoverServicesAsync();
             this.resetBusy();
             if (!this.connected) {
                 return this.services;
@@ -185,18 +182,18 @@ class NobleDevice extends events_1.EventEmitter {
     async readCharacteristics() {
         try {
             if (!this.connected) {
-                throw new Error('NobleDevice not connected');
+                throw new Error("NobleDevice not connected");
             }
             if (this.services.size == 0) {
                 await this.discoverServices();
             }
             for (let [uuid, service] of this.services) {
                 for (let [uuid, characteristic] of service.characteristics) {
-                    if (characteristic.properties.includes('read')) {
-                        log('Reading', uuid);
+                    if (characteristic.properties.includes("read")) {
+                        log("Reading", uuid);
                         const data = await characteristic.read();
-                        if (typeof data != 'undefined') {
-                            log('Data', data.toString('ascii'));
+                        if (typeof data != "undefined") {
+                            log("Data", data.toString("ascii"));
                         }
                     }
                 }
@@ -209,29 +206,20 @@ class NobleDevice extends events_1.EventEmitter {
         }
     }
     onConnect(error) {
-        log('Peripheral connect triggered');
-        // if (typeof error != "undefined" && error != "" && error != null) {
-        //   this.connected = false;
-        // } else {
-        //   this.connected = true;
-        // }
-        // this.connecting = false;
+        log("Peripheral connect triggered");
     }
     onDisconnect(error) {
         this.connected = false;
         this.connecting = false;
         this.resetBusy();
-        // Detach listeners on the underlying noble characteristics/descriptors
-        // before dropping the wrappers, otherwise they (and the wrappers they keep
-        // alive) accumulate across reconnections.
         this.services.forEach((service) => service.dispose());
         this.services = new Map();
-        this.emit('disconnected');
+        this.emit("disconnected");
     }
     toString() {
-        let text = '';
+        let text = "";
         this.services.forEach((service) => {
-            text += service.toString() + '\n';
+            text += service.toString() + "\n";
         });
         return text;
     }
@@ -245,7 +233,7 @@ class NobleDevice extends events_1.EventEmitter {
             connectable: this.connectable,
             rssi: this.rssi,
             mtu: this.mtu,
-            services: {}
+            services: {},
         };
         let services = {};
         this.services.forEach((service) => {

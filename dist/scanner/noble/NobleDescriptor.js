@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NobleDescriptor = void 0;
 const events_1 = require("events");
@@ -46,8 +46,6 @@ class NobleDescriptor extends events_1.EventEmitter {
         this.device.resetBusy();
     }
     onRead(data) {
-        // if the read notification comes from a manual read, just ignore it
-        // we are only interested in data pushed by the device
         if (!this.isReading) {
             this.lastValue = data;
             this.emit("valueRead", this.lastValue);
@@ -59,7 +57,7 @@ class NobleDescriptor extends events_1.EventEmitter {
             uuid: this.uuid,
             name: this.name,
             type: this.type,
-            value: (_a = this.lastValue) === null || _a === void 0 ? void 0 : _a.toString("hex")
+            value: (_a = this.lastValue) === null || _a === void 0 ? void 0 : _a.toString("hex"),
         };
         if (asObject) {
             return json;

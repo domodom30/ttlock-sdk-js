@@ -1,13 +1,13 @@
-'use strict';
+"use strict";
 
-import { DeviceInterface, ServiceInterface } from '../DeviceInterface';
-import { Peripheral, Service } from '@abandonware/noble';
-import { EventEmitter } from 'events';
-import { NobleService } from './NobleService';
-import { sleep } from '../../util/timingUtil';
-import { createLogger } from '../../util/logger';
+import { DeviceInterface, ServiceInterface } from "../DeviceInterface";
+import { Peripheral, Service } from "@abandonware/noble";
+import { EventEmitter } from "events";
+import { NobleService } from "./NobleService";
+import { sleep } from "../../util/timingUtil";
+import { createLogger } from "../../util/logger";
 
-const log = createLogger('ttlock:scanner');
+const log = createLogger("ttlock:scanner");
 
 export class NobleDevice extends EventEmitter implements DeviceInterface {
   id: string;
@@ -31,28 +31,28 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
     this.id = peripheral.id;
     this.uuid = peripheral.uuid;
     this.name = peripheral.advertisement.localName;
-    this.address = peripheral.address.replace(/\-/g, ':').toUpperCase();
+    this.address = peripheral.address.replace(/\-/g, ":").toUpperCase();
     this.addressType = peripheral.addressType;
     this.connectable = peripheral.connectable;
     this.rssi = peripheral.rssi;
-    // this.mtu = peripheral.mtu;
+
     if (peripheral.advertisement.manufacturerData) {
       this.manufacturerData = peripheral.advertisement.manufacturerData;
     } else {
       this.manufacturerData = Buffer.from([]);
     }
-    this.peripheral.on('connect', this.onConnect.bind(this));
-    this.peripheral.on('disconnect', this.onDisconnect.bind(this));
+    this.peripheral.on("connect", this.onConnect.bind(this));
+    this.peripheral.on("disconnect", this.onDisconnect.bind(this));
     this.services = new Map();
   }
 
   updateFromPeripheral() {
     this.name = this.peripheral.advertisement.localName;
-    this.address = this.peripheral.address.replace(/\-/g, ':').toUpperCase();
+    this.address = this.peripheral.address.replace(/\-/g, ":").toUpperCase();
     this.addressType = this.peripheral.addressType;
     this.connectable = this.peripheral.connectable;
     this.rssi = this.peripheral.rssi;
-    // this.mtu = peripheral.mtu;
+
     if (this.peripheral.advertisement.manufacturerData) {
       this.manufacturerData = this.peripheral.advertisement.manufacturerData;
     } else {
@@ -62,7 +62,7 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
 
   checkBusy(): boolean {
     if (this.busy) {
-      throw new Error('NobleDevice is busy');
+      throw new Error("NobleDevice is busy");
     } else {
       this.busy = true;
       return true;
@@ -78,18 +78,18 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
 
   async connect(timeout: number = 10): Promise<boolean> {
     if (this.connectable && !this.connected && !this.connecting) {
-      if (this.peripheral.state == 'connected') {
+      if (this.peripheral.state == "connected") {
         this.connected = true;
         return true;
       }
       this.connecting = true;
-      log('Peripheral connect start');
+      log("Peripheral connect start");
       this.peripheral.connect((error) => {
-        if (typeof error != 'undefined' && error != null) {
-          log('Peripheral connect error:', error);
+        if (typeof error != "undefined" && error != null) {
+          log("Peripheral connect error:", error);
         } else {
-          log('Peripheral state:', this.peripheral.state);
-          if (this.peripheral.state == 'connected') {
+          log("Peripheral state:", this.peripheral.state);
+          if (this.peripheral.state == "connected") {
             this.connected = true;
             this.connecting = false;
           }
@@ -108,11 +108,11 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
         } catch (error) {}
         return false;
       }
-      log('Device emiting connected');
-      this.emit('connected');
+      log("Device emiting connected");
+      this.emit("connected");
       return true;
     }
-    log('Peripheral state:', this.peripheral.state);
+    log("Peripheral state:", this.peripheral.state);
     return false;
   }
 
@@ -137,9 +137,10 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
       this.checkBusy();
       if (!this.connected) {
         this.resetBusy();
-        throw new Error('NobleDevice not connected');
+        throw new Error("NobleDevice not connected");
       }
-      const snc = await this.peripheral.discoverAllServicesAndCharacteristicsAsync();
+      const snc =
+        await this.peripheral.discoverAllServicesAndCharacteristicsAsync();
       this.resetBusy();
       this.services = new Map();
       snc.services.forEach((service) => {
@@ -162,7 +163,7 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
       this.checkBusy();
       if (!this.connected) {
         this.resetBusy();
-        throw new Error('NobleDevice not connected');
+        throw new Error("NobleDevice not connected");
       }
       let timeoutCycles = 10 * 100;
       let services: Service[] = [];
@@ -174,7 +175,7 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
         await sleep(10);
         timeoutCycles--;
       } while (services.length == 0 && timeoutCycles > 0 && this.connected);
-      // const services = await this.peripheral.discoverServicesAsync();
+
       this.resetBusy();
       if (!this.connected) {
         return this.services;
@@ -199,18 +200,18 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
   async readCharacteristics(): Promise<boolean> {
     try {
       if (!this.connected) {
-        throw new Error('NobleDevice not connected');
+        throw new Error("NobleDevice not connected");
       }
       if (this.services.size == 0) {
         await this.discoverServices();
       }
       for (let [uuid, service] of this.services) {
         for (let [uuid, characteristic] of service.characteristics) {
-          if (characteristic.properties.includes('read')) {
-            log('Reading', uuid);
+          if (characteristic.properties.includes("read")) {
+            log("Reading", uuid);
             const data = await characteristic.read();
-            if (typeof data != 'undefined') {
-              log('Data', data.toString('ascii'));
+            if (typeof data != "undefined") {
+              log("Data", data.toString("ascii"));
             }
           }
         }
@@ -223,31 +224,22 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
   }
 
   onConnect(error: string) {
-    log('Peripheral connect triggered');
-    // if (typeof error != "undefined" && error != "" && error != null) {
-    //   this.connected = false;
-    // } else {
-    //   this.connected = true;
-    // }
-    // this.connecting = false;
+    log("Peripheral connect triggered");
   }
 
   onDisconnect(error: string) {
     this.connected = false;
     this.connecting = false;
     this.resetBusy();
-    // Detach listeners on the underlying noble characteristics/descriptors
-    // before dropping the wrappers, otherwise they (and the wrappers they keep
-    // alive) accumulate across reconnections.
     this.services.forEach((service) => service.dispose());
     this.services = new Map();
-    this.emit('disconnected');
+    this.emit("disconnected");
   }
 
   toString(): string {
-    let text = '';
+    let text = "";
     this.services.forEach((service) => {
-      text += service.toString() + '\n';
+      text += service.toString() + "\n";
     });
     return text;
   }
@@ -262,7 +254,7 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
       connectable: this.connectable,
       rssi: this.rssi,
       mtu: this.mtu,
-      services: {}
+      services: {},
     };
     let services: Record<string, any> = {};
     this.services.forEach((service) => {

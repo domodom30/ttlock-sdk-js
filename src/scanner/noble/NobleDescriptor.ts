@@ -1,11 +1,14 @@
-'use strict';
+"use strict";
 
 import { Descriptor } from "@abandonware/noble";
 import { EventEmitter } from "events";
 import { DescriptorInterface } from "../DeviceInterface";
 import { NobleDevice } from "./NobleDevice";
 
-export class NobleDescriptor extends EventEmitter implements DescriptorInterface {
+export class NobleDescriptor
+  extends EventEmitter
+  implements DescriptorInterface
+{
   uuid: string;
   name?: string | undefined;
   type?: string | undefined;
@@ -62,8 +65,6 @@ export class NobleDescriptor extends EventEmitter implements DescriptorInterface
   }
 
   private onRead(data: Buffer) {
-    // if the read notification comes from a manual read, just ignore it
-    // we are only interested in data pushed by the device
     if (!this.isReading) {
       this.lastValue = data;
       this.emit("valueRead", this.lastValue);
@@ -75,8 +76,8 @@ export class NobleDescriptor extends EventEmitter implements DescriptorInterface
       uuid: this.uuid,
       name: this.name,
       type: this.type,
-      value: this.lastValue?.toString("hex")
-    }
+      value: this.lastValue?.toString("hex"),
+    };
 
     if (asObject) {
       return json;

@@ -1,7 +1,7 @@
-import { Service } from '@abandonware/noble';
-import { CharacteristicInterface, ServiceInterface } from '../DeviceInterface';
-import { NobleCharacteristic } from './NobleCharacteristic';
-import { NobleDevice } from './NobleDevice';
+import { Service } from "@abandonware/noble";
+import { CharacteristicInterface, ServiceInterface } from "../DeviceInterface";
+import { NobleCharacteristic } from "./NobleCharacteristic";
+import { NobleDevice } from "./NobleDevice";
 export declare class NobleService implements ServiceInterface {
     uuid: string;
     name: string;

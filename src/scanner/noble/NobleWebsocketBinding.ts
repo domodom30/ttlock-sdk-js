@@ -1,13 +1,13 @@
-'use strict';
+"use strict";
 
-import { EventEmitter } from 'events';
-import ReconnectingWebSocket from 'reconnecting-websocket';
-import WebSocket from 'ws';
-import CryptoJS from 'crypto-js';
-import chalk from 'chalk';
-import { createLogger } from '../../util/logger';
+import { EventEmitter } from "events";
+import ReconnectingWebSocket from "reconnecting-websocket";
+import WebSocket from "ws";
+import CryptoJS from "crypto-js";
+import chalk from "chalk";
+import { createLogger } from "../../util/logger";
 
-const log = createLogger('ttlock:scanner');
+const log = createLogger("ttlock:scanner");
 
 type Peripheral = {
   uuid: string;
@@ -60,11 +60,17 @@ export class NobleWebsocketBinding extends EventEmitter {
   private aesKey: CryptoJS.lib.WordArray;
   private credentials: string;
 
-  constructor(address: string, port: number, key: string, user: string, pass: string) {
+  constructor(
+    address: string,
+    port: number,
+    key: string,
+    user: string,
+    pass: string,
+  ) {
     super();
 
     this.aesKey = CryptoJS.enc.Hex.parse(key);
-    this.credentials = user + ':' + pass;
+    this.credentials = user + ":" + pass;
     this.auth = false;
     this.connected = false;
     this.wasReady = false;
@@ -72,9 +78,11 @@ export class NobleWebsocketBinding extends EventEmitter {
     this.startScanCommand = null;
     this.peripherals = new Map();
 
-    this.ws = new ReconnectingWebSocket(`ws://${address}:${port}/noble`, [], { WebSocket: WebSocket });
+    this.ws = new ReconnectingWebSocket(`ws://${address}:${port}/noble`, [], {
+      WebSocket: WebSocket,
+    });
 
-    this.on('message', this.onMessage.bind(this));
+    this.on("message", this.onMessage.bind(this));
 
     this.ws.onopen = this.onOpen.bind(this);
     this.ws.onclose = this.onClose.bind(this);
@@ -82,10 +90,10 @@ export class NobleWebsocketBinding extends EventEmitter {
 
     this.ws.onmessage = (event: any) => {
       try {
-        if (process.env.WEBSOCKET_DEBUG == '1') {
-          log('Received: ' + chalk.green(event.data.toString()));
+        if (process.env.WEBSOCKET_DEBUG == "1") {
+          log("Received: " + chalk.green(event.data.toString()));
         }
-        this.emit('message', JSON.parse(event.data.toString()));
+        this.emit("message", JSON.parse(event.data.toString()));
       } catch (error) {
         log.error(error);
       }
@@ -95,30 +103,24 @@ export class NobleWebsocketBinding extends EventEmitter {
   init() {}
 
   private onOpen() {
-    log(chalk.green('Websocket connected'));
+    log(chalk.green("Websocket connected"));
   }
 
   private onClose() {
     this.auth = false;
     const wasConnected = this.connected;
     this.connected = false;
-    // Allow the next successful connection to re-emit 'stateChange' (the guard
-    // below only fires it while wasReady is false). Without this the SDK never
-    // learns the link came back and monitoring stays silently dead.
     this.wasReady = false;
-    log(chalk.red('Websocket disconnected'));
-    // Surface the link going down as a BLE adapter power-off so the scanner
-    // state machine (NobleScanner) drops out of 'scanning' and downstream
-    // monitoring flags reset. Only emit on a real transition to avoid churn
-    // during reconnecting-websocket backoff (onerror fires repeatedly).
+    log(chalk.red("Websocket disconnected"));
+
     if (wasConnected) {
-      this.emit('stateChange', 'poweredOff');
+      this.emit("stateChange", "poweredOff");
     }
     for (const [peripheralUuid, peripheral] of this.peripherals) {
       if (peripheral.connected) {
         peripheral.connected = false;
-        log('Disconnect', peripheralUuid);
-        this.emit('disconnect', peripheralUuid);
+        log("Disconnect", peripheralUuid);
+        this.emit("disconnect", peripheralUuid);
       }
       if (peripheral.connecting && !peripheral.bufferedConnect) {
         // add re-connect to buffer
@@ -130,61 +132,80 @@ export class NobleWebsocketBinding extends EventEmitter {
   }
 
   private onMessage(event: WsEvent) {
-    let { type, peripheralUuid, address, addressType, connectable, advertisement, rssi, serviceUuids, serviceUuid, includedServiceUuids, characteristics, characteristicUuid, isNotification, state, descriptors, descriptorUuid, handle } = event;
-    const data = event.data ? Buffer.from(event.data, 'hex') : null;
+    let {
+      type,
+      peripheralUuid,
+      address,
+      addressType,
+      connectable,
+      advertisement,
+      rssi,
+      serviceUuids,
+      serviceUuid,
+      includedServiceUuids,
+      characteristics,
+      characteristicUuid,
+      isNotification,
+      state,
+      descriptors,
+      descriptorUuid,
+      handle,
+    } = event;
+    const data = event.data ? Buffer.from(event.data, "hex") : null;
 
-    if (type === 'auth') {
-      // send authentication response
-      if (typeof event.challenge != 'undefined' && event.challenge.length == 32) {
+    if (type === "auth") {
+      if (
+        typeof event.challenge != "undefined" &&
+        event.challenge.length == 32
+      ) {
         const challenge = CryptoJS.enc.Hex.parse(event.challenge);
         const response = CryptoJS.AES.encrypt(this.credentials, this.aesKey, {
           iv: challenge,
           mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.ZeroPadding
+          padding: CryptoJS.pad.ZeroPadding,
         });
 
         this.sendCommand({
-          action: 'auth',
-          response: response.toString(CryptoJS.format.Hex)
+          action: "auth",
+          response: response.toString(CryptoJS.format.Hex),
         });
       }
-    } else if (type === 'stateChange') {
-      if (state == 'poweredOn' && !this.auth) {
+    } else if (type === "stateChange") {
+      if (state == "poweredOn" && !this.auth) {
         this.auth = true;
         this.connected = true;
         if (this.buffer.length > 0) {
-          if (process.env.WEBSOCKET_DEBUG == '1') {
-            log('Sending buffered commands', this.buffer);
+          if (process.env.WEBSOCKET_DEBUG == "1") {
+            log("Sending buffered commands", this.buffer);
           }
           for (let command of this.buffer) {
             this.sendCommand(command);
           }
           this.buffer = [];
         }
-        // Resume an active scan after a reconnect: on a fresh websocket
-        // session the gateway has reset its BLE state and the original
-        // startScanning command is gone, so monitoring would silently stay
-        // dead unless we re-issue it.
         if (this.startScanCommand != null) {
-          if (process.env.WEBSOCKET_DEBUG == '1') {
-            log('Resuming scan after reconnect', this.startScanCommand);
+          if (process.env.WEBSOCKET_DEBUG == "1") {
+            log("Resuming scan after reconnect", this.startScanCommand);
           }
           this.sendCommand(this.startScanCommand);
         }
       }
       if (!this.wasReady) {
-        // only send state change once after the initial connection
         this.wasReady = true;
-        this.emit('stateChange', state);
+        this.emit("stateChange", state);
       }
-    } else if (type === 'discover') {
-      if (typeof advertisement != 'undefined') {
+    } else if (type === "discover") {
+      if (typeof advertisement != "undefined") {
         const advertisementObj = {
           localName: advertisement.localName,
           txPowerLevel: advertisement.txPowerLevel,
           serviceUuids: advertisement.serviceUuids,
-          manufacturerData: advertisement.manufacturerData ? Buffer.from(advertisement.manufacturerData, 'hex') : null,
-          serviceData: advertisement.serviceData ? Buffer.from(advertisement.serviceData, 'hex') : null
+          manufacturerData: advertisement.manufacturerData
+            ? Buffer.from(advertisement.manufacturerData, "hex")
+            : null,
+          serviceData: advertisement.serviceData
+            ? Buffer.from(advertisement.serviceData, "hex")
+            : null,
         };
 
         let peripheral: Peripheral = {
@@ -194,103 +215,163 @@ export class NobleWebsocketBinding extends EventEmitter {
           rssi: rssi,
           connected: false,
           connecting: false,
-          bufferedConnect: false
+          bufferedConnect: false,
         };
         this.peripherals.set(peripheralUuid, peripheral);
 
-        this.emit('discover', peripheralUuid, address, addressType, connectable, advertisementObj, rssi);
+        this.emit(
+          "discover",
+          peripheralUuid,
+          address,
+          addressType,
+          connectable,
+          advertisementObj,
+          rssi,
+        );
       }
-    } else if (type === 'connect') {
+    } else if (type === "connect") {
       const peripheral = this.peripherals.get(peripheralUuid);
-      if (typeof peripheral != 'undefined') {
+      if (typeof peripheral != "undefined") {
         peripheral.connected = true;
         peripheral.connecting = false;
         peripheral.bufferedConnect = false;
       }
-      this.emit('connect', peripheralUuid);
-    } else if (type === 'disconnect') {
+      this.emit("connect", peripheralUuid);
+    } else if (type === "disconnect") {
       const peripheral = this.peripherals.get(peripheralUuid);
-      if (typeof peripheral != 'undefined') {
+      if (typeof peripheral != "undefined") {
         peripheral.connected = false;
         peripheral.connecting = false;
         peripheral.bufferedConnect = false;
       }
-      this.emit('disconnect', peripheralUuid);
-    } else if (type === 'rssiUpdate') {
-      this.emit('rssiUpdate', peripheralUuid, rssi);
-    } else if (type === 'servicesDiscover') {
-      this.emit('servicesDiscover', peripheralUuid, serviceUuids);
-    } else if (type === 'includedServicesDiscover') {
-      this.emit('includedServicesDiscover', peripheralUuid, serviceUuid, includedServiceUuids);
-    } else if (type === 'characteristicsDiscover') {
-      this.emit('characteristicsDiscover', peripheralUuid, serviceUuid, characteristics);
-    } else if (type === 'read') {
-      this.emit('read', peripheralUuid, serviceUuid, characteristicUuid, data, isNotification);
-    } else if (type === 'write') {
-      this.emit('write', peripheralUuid, serviceUuid, characteristicUuid);
-    } else if (type === 'broadcast') {
-      this.emit('broadcast', peripheralUuid, serviceUuid, characteristicUuid, state);
-    } else if (type === 'notify') {
-      this.emit('notify', peripheralUuid, serviceUuid, characteristicUuid, state);
-    } else if (type === 'descriptorsDiscover') {
-      this.emit('descriptorsDiscover', peripheralUuid, serviceUuid, characteristicUuid, descriptors);
-    } else if (type === 'valueRead') {
-      this.emit('valueRead', peripheralUuid, serviceUuid, characteristicUuid, descriptorUuid, data);
-    } else if (type === 'valueWrite') {
-      this.emit('valueWrite', peripheralUuid, serviceUuid, characteristicUuid, descriptorUuid);
-    } else if (type === 'handleRead') {
-      this.emit('handleRead', peripheralUuid, handle, data);
-    } else if (type === 'handleWrite') {
-      this.emit('handleWrite', peripheralUuid, handle);
-    } else if (type === 'handleNotify') {
-      this.emit('handleNotify', peripheralUuid, handle, data);
+      this.emit("disconnect", peripheralUuid);
+    } else if (type === "rssiUpdate") {
+      this.emit("rssiUpdate", peripheralUuid, rssi);
+    } else if (type === "servicesDiscover") {
+      this.emit("servicesDiscover", peripheralUuid, serviceUuids);
+    } else if (type === "includedServicesDiscover") {
+      this.emit(
+        "includedServicesDiscover",
+        peripheralUuid,
+        serviceUuid,
+        includedServiceUuids,
+      );
+    } else if (type === "characteristicsDiscover") {
+      this.emit(
+        "characteristicsDiscover",
+        peripheralUuid,
+        serviceUuid,
+        characteristics,
+      );
+    } else if (type === "read") {
+      this.emit(
+        "read",
+        peripheralUuid,
+        serviceUuid,
+        characteristicUuid,
+        data,
+        isNotification,
+      );
+    } else if (type === "write") {
+      this.emit("write", peripheralUuid, serviceUuid, characteristicUuid);
+    } else if (type === "broadcast") {
+      this.emit(
+        "broadcast",
+        peripheralUuid,
+        serviceUuid,
+        characteristicUuid,
+        state,
+      );
+    } else if (type === "notify") {
+      this.emit(
+        "notify",
+        peripheralUuid,
+        serviceUuid,
+        characteristicUuid,
+        state,
+      );
+    } else if (type === "descriptorsDiscover") {
+      this.emit(
+        "descriptorsDiscover",
+        peripheralUuid,
+        serviceUuid,
+        characteristicUuid,
+        descriptors,
+      );
+    } else if (type === "valueRead") {
+      this.emit(
+        "valueRead",
+        peripheralUuid,
+        serviceUuid,
+        characteristicUuid,
+        descriptorUuid,
+        data,
+      );
+    } else if (type === "valueWrite") {
+      this.emit(
+        "valueWrite",
+        peripheralUuid,
+        serviceUuid,
+        characteristicUuid,
+        descriptorUuid,
+      );
+    } else if (type === "handleRead") {
+      this.emit("handleRead", peripheralUuid, handle, data);
+    } else if (type === "handleWrite") {
+      this.emit("handleWrite", peripheralUuid, handle);
+    } else if (type === "handleNotify") {
+      this.emit("handleNotify", peripheralUuid, handle, data);
     }
   }
 
   private sendCommand(command: any, errorCallback?: any) {
-    if (!this.auth && command.action != 'auth') {
-      if (process.env.WEBSOCKET_DEBUG == '1') {
-        log('Buffering command', command);
+    if (!this.auth && command.action != "auth") {
+      if (process.env.WEBSOCKET_DEBUG == "1") {
+        log("Buffering command", command);
       }
       this.buffer.push(command);
     } else {
       const message = JSON.stringify(command);
       this.ws.send(message);
-      if (process.env.WEBSOCKET_DEBUG == '1') {
-        log('Sent:    ' + chalk.cyan(message));
+      if (process.env.WEBSOCKET_DEBUG == "1") {
+        log("Sent:    " + chalk.cyan(message));
       }
     }
   }
 
   startScanning(serviceUuids: string[], allowDuplicates: boolean = true) {
     this.startScanCommand = {
-      action: 'startScanning',
+      action: "startScanning",
       serviceUuids: serviceUuids,
-      allowDuplicates: allowDuplicates
+      allowDuplicates: allowDuplicates,
     };
     this.sendCommand(this.startScanCommand);
 
-    this.emit('scanStart');
+    this.emit("scanStart");
   }
 
   stopScanning() {
     this.startScanCommand = null;
 
     this.sendCommand({
-      action: 'stopScanning'
+      action: "stopScanning",
     });
 
-    this.emit('scanStop');
+    this.emit("scanStop");
   }
 
   connect(deviceUuid: string) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined' && !peripheral.connected && !peripheral.connecting) {
+    if (
+      typeof peripheral != "undefined" &&
+      !peripheral.connected &&
+      !peripheral.connecting
+    ) {
       peripheral.connecting = true;
       this.sendCommand({
-        action: 'connect',
-        peripheralUuid: peripheral.uuid
+        action: "connect",
+        peripheralUuid: peripheral.uuid,
       });
     }
   }
@@ -298,10 +379,10 @@ export class NobleWebsocketBinding extends EventEmitter {
   disconnect(deviceUuid: string) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'disconnect',
-        peripheralUuid: peripheral.uuid
+        action: "disconnect",
+        peripheralUuid: peripheral.uuid,
       });
     }
   }
@@ -309,10 +390,10 @@ export class NobleWebsocketBinding extends EventEmitter {
   updateRssi(deviceUuid: string) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'updateRssi',
-        peripheralUuid: peripheral.uuid
+        action: "updateRssi",
+        peripheralUuid: peripheral.uuid,
       });
     }
   }
@@ -320,37 +401,45 @@ export class NobleWebsocketBinding extends EventEmitter {
   discoverServices(deviceUuid: string, uuids: string[]) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'discoverServices',
+        action: "discoverServices",
         peripheralUuid: peripheral.uuid,
-        uuids: uuids
+        uuids: uuids,
       });
     }
   }
 
-  discoverIncludedServices(deviceUuid: string, serviceUuid: string, serviceUuids: string[]) {
+  discoverIncludedServices(
+    deviceUuid: string,
+    serviceUuid: string,
+    serviceUuids: string[],
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'discoverIncludedServices',
+        action: "discoverIncludedServices",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
-        serviceUuids: serviceUuids
+        serviceUuids: serviceUuids,
       });
     }
   }
 
-  discoverCharacteristics(deviceUuid: string, serviceUuid: string, characteristicUuids: string[]) {
+  discoverCharacteristics(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuids: string[],
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'discoverCharacteristics',
+        action: "discoverCharacteristics",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
-        characteristicUuids: characteristicUuids
+        characteristicUuids: characteristicUuids,
       });
     }
   }
@@ -358,97 +447,128 @@ export class NobleWebsocketBinding extends EventEmitter {
   read(deviceUuid: string, serviceUuid: string, characteristicUuid: string) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'read',
-        peripheralUuid: peripheral.uuid,
-        serviceUuid: serviceUuid,
-        characteristicUuid: characteristicUuid
-      });
-    }
-  }
-
-  write(deviceUuid: string, serviceUuid: string, characteristicUuid: string, data: Buffer, withoutResponse: boolean) {
-    const peripheral = this.peripherals.get(deviceUuid);
-
-    if (typeof peripheral != 'undefined') {
-      this.sendCommand({
-        action: 'write',
+        action: "read",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
-        data: data.toString('hex'),
-        withoutResponse: withoutResponse
       });
     }
   }
 
-  broadcast(deviceUuid: string, serviceUuid: string, characteristicUuid: string, broadcast: any) {
+  write(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuid: string,
+    data: Buffer,
+    withoutResponse: boolean,
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'broadcast',
+        action: "write",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
-        broadcast: broadcast
+        data: data.toString("hex"),
+        withoutResponse: withoutResponse,
       });
     }
   }
 
-  notify(deviceUuid: string, serviceUuid: string, characteristicUuid: string, notify: any) {
+  broadcast(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuid: string,
+    broadcast: any,
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'notify',
+        action: "broadcast",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
-        notify: notify
+        broadcast: broadcast,
       });
     }
   }
 
-  discoverDescriptors(deviceUuid: string, serviceUuid: string, characteristicUuid: string) {
+  notify(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuid: string,
+    notify: any,
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'discoverDescriptors',
-        peripheralUuid: peripheral.uuid,
-        serviceUuid: serviceUuid,
-        characteristicUuid: characteristicUuid
-      });
-    }
-  }
-
-  readValue(deviceUuid: string, serviceUuid: string, characteristicUuid: string, descriptorUuid: string) {
-    const peripheral = this.peripherals.get(deviceUuid);
-
-    if (typeof peripheral != 'undefined') {
-      this.sendCommand({
-        action: 'readValue',
+        action: "notify",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
-        descriptorUuid: descriptorUuid
+        notify: notify,
       });
     }
   }
 
-  writeValue(deviceUuid: string, serviceUuid: string, characteristicUuid: string, descriptorUuid: string, data: Buffer) {
+  discoverDescriptors(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuid: string,
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'writeValue',
+        action: "discoverDescriptors",
+        peripheralUuid: peripheral.uuid,
+        serviceUuid: serviceUuid,
+        characteristicUuid: characteristicUuid,
+      });
+    }
+  }
+
+  readValue(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuid: string,
+    descriptorUuid: string,
+  ) {
+    const peripheral = this.peripherals.get(deviceUuid);
+
+    if (typeof peripheral != "undefined") {
+      this.sendCommand({
+        action: "readValue",
         peripheralUuid: peripheral.uuid,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
         descriptorUuid: descriptorUuid,
-        data: data.toString('hex')
+      });
+    }
+  }
+
+  writeValue(
+    deviceUuid: string,
+    serviceUuid: string,
+    characteristicUuid: string,
+    descriptorUuid: string,
+    data: Buffer,
+  ) {
+    const peripheral = this.peripherals.get(deviceUuid);
+
+    if (typeof peripheral != "undefined") {
+      this.sendCommand({
+        action: "writeValue",
+        peripheralUuid: peripheral.uuid,
+        serviceUuid: serviceUuid,
+        characteristicUuid: characteristicUuid,
+        descriptorUuid: descriptorUuid,
+        data: data.toString("hex"),
       });
     }
   }
@@ -456,25 +576,30 @@ export class NobleWebsocketBinding extends EventEmitter {
   readHandle(deviceUuid: string, handle: any) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'readHandle',
+        action: "readHandle",
         peripheralUuid: peripheral.uuid,
-        handle: handle
+        handle: handle,
       });
     }
   }
 
-  writeHandle(deviceUuid: string, handle: any, data: Buffer, withoutResponse: boolean) {
+  writeHandle(
+    deviceUuid: string,
+    handle: any,
+    data: Buffer,
+    withoutResponse: boolean,
+  ) {
     const peripheral = this.peripherals.get(deviceUuid);
 
-    if (typeof peripheral != 'undefined') {
+    if (typeof peripheral != "undefined") {
       this.sendCommand({
-        action: 'writeHandle',
+        action: "writeHandle",
         peripheralUuid: peripheral.uuid,
         handle: handle,
-        data: data.toString('hex'),
-        withoutResponse: withoutResponse
+        data: data.toString("hex"),
+        withoutResponse: withoutResponse,
       });
     }
   }

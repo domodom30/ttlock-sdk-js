@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -27,7 +27,6 @@ Object.defineProperty(exports, "LockFirmwareError", { enumerable: true, get: fun
 var ValidityInfo_1 = require("./api/ValidityInfo");
 Object.defineProperty(exports, "ValidityInfo", { enumerable: true, get: function () { return ValidityInfo_1.ValidityInfo; } });
 __exportStar(require("./constant"), exports);
-// extra stuff used in testing
 __exportStar(require("./api/Commands"), exports);
 var CommandEnvelope_1 = require("./api/CommandEnvelope");
 Object.defineProperty(exports, "CommandEnvelope", { enumerable: true, get: function () { return CommandEnvelope_1.CommandEnvelope; } });

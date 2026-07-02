@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -13,7 +13,7 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     constructor(options) {
         super();
         this.bleService = null;
-        this.scannerType = 'noble';
+        this.scannerType = "noble";
         this.lockDevices = new Map();
         this.scanning = false;
         this.monitoring = false;
@@ -41,14 +41,13 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     async prepareBTService() {
         if (this.bleService == null) {
             this.bleService = new BluetoothLeService_1.BluetoothLeService(this.uuids, this.scannerType, this.scannerOptions);
-            this.bleService.on('ready', () => {
+            this.bleService.on("ready", () => {
                 this.adapterReady = true;
-                this.emit('ready');
+                this.emit("ready");
             });
-            this.bleService.on('scanStart', this.onScanStart.bind(this));
-            this.bleService.on('scanStop', this.onScanStop.bind(this));
-            this.bleService.on('discover', this.onScanResult.bind(this));
-            // wait for adapter to become ready
+            this.bleService.on("scanStart", this.onScanStart.bind(this));
+            this.bleService.on("scanStop", this.onScanStop.bind(this));
+            this.bleService.on("discover", this.onScanResult.bind(this));
             let counter = 5;
             do {
                 await (0, timingUtil_1.sleep)(500);
@@ -61,9 +60,6 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     stopBTService() {
         if (this.bleService != null) {
             this.stopScanLock();
-            // Detach the scanner's listeners (incl. those on the global noble
-            // singleton) before dropping the reference, otherwise each
-            // prepare/stop cycle leaks them.
             this.bleService.destroy();
             this.bleService = null;
         }
@@ -86,16 +82,10 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     async startMonitor() {
         if (this.bleService == null)
             return false;
-        // Never interrupt an in-progress / requested manual scan.
         if (this.scanning)
             return false;
-        // Already actively monitoring — idempotent success.
         if (this.monitoring && this.bleService.isScanning())
             return true;
-        // Re-arm. A silent gateway drop can leave `monitoring` stuck true with no
-        // matching scanStop (the scanner never reported stopping), which made the
-        // old `!this.monitoring` guard turn this into a permanent no-op — the
-        // monitor stayed dead until a manual scan. Reset and (re)start instead.
         this.monitoring = true;
         this.monitoring = await this.bleService.startScan(true);
         return this.monitoring;
@@ -103,9 +93,6 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     async stopMonitor() {
         if (this.bleService == null)
             return false;
-        // Always clear the flag, even when the scanner no longer reports
-        // 'scanning' (e.g. after a silent gateway drop). The old early-return left
-        // `monitoring` true forever, wedging every subsequent startMonitor().
         this.monitoring = false;
         if (this.bleService.isScanning()) {
             return await this.bleService.stopScan();
@@ -145,44 +132,43 @@ class TTLockClient extends node_events_1.default.EventEmitter {
     }
     onScanStart() {
         if (this.scanning) {
-            this.emit('scanStart');
+            this.emit("scanStart");
         }
         else if (this.monitoring) {
-            this.emit('monitorStart');
+            this.emit("monitorStart");
         }
     }
     onScanStop() {
         if (this.scanning) {
-            this.emit('scanStop');
+            this.emit("scanStop");
             this.scanning = false;
         }
         else if (this.monitoring) {
-            this.emit('monitorStop');
+            this.emit("monitorStop");
             this.monitoring = false;
         }
     }
     onScanResult(device) {
-        // Is it a Lock device ?
         if (device.lockType != Lock_1.LockType.UNKNOWN) {
             if (!this.lockDevices.has(device.address)) {
                 const data = this.lockData.get(device.address);
                 const lock = new TTLock_1.TTLock(device, data);
                 this.lockDevices.set(device.address, lock);
-                lock.on('dataUpdated', (lock) => {
+                lock.on("dataUpdated", (lock) => {
                     const lockData = lock.getLockData();
                     if (lockData != undefined) {
                         this.lockData.set(lockData.address, lockData);
-                        this.emit('updatedLockData');
+                        this.emit("updatedLockData");
                     }
                 });
-                lock.on('lockReset', (address, id) => {
+                lock.on("lockReset", (address, id) => {
                     var _a;
                     this.lockData.delete(address);
                     this.lockDevices.delete(address);
                     (_a = this.bleService) === null || _a === void 0 ? void 0 : _a.forgetDevice(id);
-                    this.emit('updatedLockData');
+                    this.emit("updatedLockData");
                 });
-                this.emit('foundLock', lock);
+                this.emit("foundLock", lock);
             }
         }
     }

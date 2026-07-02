@@ -1,7 +1,7 @@
-import { DeviceInterface, ServiceInterface } from '../DeviceInterface';
-import { Peripheral } from '@abandonware/noble';
-import { EventEmitter } from 'events';
-import { NobleService } from './NobleService';
+import { DeviceInterface, ServiceInterface } from "../DeviceInterface";
+import { Peripheral } from "@abandonware/noble";
+import { EventEmitter } from "events";
+import { NobleService } from "./NobleService";
 export declare class NobleDevice extends EventEmitter implements DeviceInterface {
     id: string;
     uuid: string;

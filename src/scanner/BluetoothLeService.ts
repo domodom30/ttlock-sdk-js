@@ -1,14 +1,21 @@
-'use strict';
+"use strict";
 
 import { EventEmitter } from "events";
-import { ScannerInterface, ScannerOptions, ScannerType } from "./ScannerInterface";
+import {
+  ScannerInterface,
+  ScannerOptions,
+  ScannerType,
+} from "./ScannerInterface";
 import { NobleScanner } from "./noble/NobleScanner";
 import { TTBluetoothDevice } from "../device/TTBluetoothDevice";
 import { DeviceInterface } from "./DeviceInterface";
 import { NobleScannerWebsocket } from "./noble/NobleScannerWebsocket";
 
 export { ScannerType } from "./ScannerInterface";
-export const TTLockUUIDs: string[] = ["1910", "00001910-0000-1000-8000-00805f9b34fb"];
+export const TTLockUUIDs: string[] = [
+  "1910",
+  "00001910-0000-1000-8000-00805f9b34fb",
+];
 
 export interface BluetoothLeService {
   on(event: "ready", listener: () => void): this;
@@ -17,22 +24,31 @@ export interface BluetoothLeService {
   on(event: "scanStop", listener: () => void): this;
 }
 
-export class BluetoothLeService extends EventEmitter implements BluetoothLeService {
+export class BluetoothLeService
+  extends EventEmitter
+  implements BluetoothLeService
+{
   private scanner: ScannerInterface;
   private btDevices: Map<string, TTBluetoothDevice>;
 
-  constructor(uuids: string[] = TTLockUUIDs, scannerType: ScannerType = "noble", scannerOptions: ScannerOptions) {
+  constructor(
+    uuids: string[] = TTLockUUIDs,
+    scannerType: ScannerType = "noble",
+    scannerOptions: ScannerOptions,
+  ) {
     super();
     this.btDevices = new Map();
     if (scannerType == "noble") {
       this.scanner = new NobleScanner(uuids);
     } else if (scannerType == "noble-websocket") {
-      this.scanner = new NobleScannerWebsocket(uuids, 
-        scannerOptions.websocketHost, 
+      this.scanner = new NobleScannerWebsocket(
+        uuids,
+        scannerOptions.websocketHost,
         scannerOptions.websocketPort,
         scannerOptions.websocketAesKey,
         scannerOptions.websocketUsername,
-        scannerOptions.websocketPassword);
+        scannerOptions.websocketPassword,
+      );
     } else {
       throw "Invalid parameters";
     }
@@ -65,10 +81,9 @@ export class BluetoothLeService extends EventEmitter implements BluetoothLeServi
 
   private onDiscover(device: DeviceInterface) {
     // TODO: move device storage to TTLockClient
-    // check if the device was previously discovered and update
-    if(this.btDevices.has(device.id)) {
+    if (this.btDevices.has(device.id)) {
       const ttDevice = this.btDevices.get(device.id);
-      if (typeof ttDevice != 'undefined') {
+      if (typeof ttDevice != "undefined") {
         ttDevice.updateFromDevice(device);
         // this.emit("discover", ttDevice);
       }

@@ -56,7 +56,10 @@ class TTBluetoothDevice extends TTDevice_1.TTDevice {
                     await this.readBasicInfo();
                 }
                 catch (err) {
-                    log.error("readBasicInfo failed, disconnecting", err);
+                    // Recoverable transient: the lock often drops the link mid GATT read
+                    // on a weak signal. The caller retries, so this is a warning, not an
+                    // error, to avoid alarming logs for a self-healing condition.
+                    log.warn("readBasicInfo failed, disconnecting", err);
                     try {
                         await this.device.disconnect();
                     }

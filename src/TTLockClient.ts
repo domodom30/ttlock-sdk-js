@@ -1,14 +1,18 @@
-'use strict';
+"use strict";
 
-import events from 'node:events';
-import { LockType } from './constant/Lock';
-import { TTBluetoothDevice } from './device/TTBluetoothDevice';
-import { TTLock } from './device/TTLock';
+import events from "node:events";
+import { LockType } from "./constant/Lock";
+import { TTBluetoothDevice } from "./device/TTBluetoothDevice";
+import { TTLock } from "./device/TTLock";
 
-import { BluetoothLeService, TTLockUUIDs, ScannerType } from './scanner/BluetoothLeService';
-import { ScannerOptions } from './scanner/ScannerInterface';
-import { TTLockData } from './store/TTLockData';
-import { sleep } from './util/timingUtil';
+import {
+  BluetoothLeService,
+  TTLockUUIDs,
+  ScannerType,
+} from "./scanner/BluetoothLeService";
+import { ScannerOptions } from "./scanner/ScannerInterface";
+import { TTLockData } from "./store/TTLockData";
+import { sleep } from "./util/timingUtil";
 
 export interface Settings {
   uuids?: string[];
@@ -18,19 +22,19 @@ export interface Settings {
 }
 
 export interface TTLockClient {
-  on(event: 'ready', listener: () => void): this;
-  on(event: 'foundLock', listener: (lock: TTLock) => void): this;
-  on(event: 'scanStart', listener: () => void): this;
-  on(event: 'scanStop', listener: () => void): this;
-  on(event: 'updatedLockData', listener: () => void): this;
-  on(event: 'monitorStart', listener: () => void): this;
-  on(event: 'monitorStop', listener: () => void): this;
+  on(event: "ready", listener: () => void): this;
+  on(event: "foundLock", listener: (lock: TTLock) => void): this;
+  on(event: "scanStart", listener: () => void): this;
+  on(event: "scanStop", listener: () => void): this;
+  on(event: "updatedLockData", listener: () => void): this;
+  on(event: "monitorStart", listener: () => void): this;
+  on(event: "monitorStop", listener: () => void): this;
 }
 
 export class TTLockClient extends events.EventEmitter implements TTLockClient {
   bleService: BluetoothLeService | null = null;
   uuids: string[];
-  scannerType: ScannerType = 'noble';
+  scannerType: ScannerType = "noble";
   scannerOptions: ScannerOptions;
   lockData: Map<string, TTLockData>;
   private adapterReady: boolean;
@@ -67,15 +71,19 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   async prepareBTService(): Promise<boolean> {
     if (this.bleService == null) {
-      this.bleService = new BluetoothLeService(this.uuids, this.scannerType, this.scannerOptions);
-      this.bleService.on('ready', () => {
+      this.bleService = new BluetoothLeService(
+        this.uuids,
+        this.scannerType,
+        this.scannerOptions,
+      );
+      this.bleService.on("ready", () => {
         this.adapterReady = true;
-        this.emit('ready');
+        this.emit("ready");
       });
-      this.bleService.on('scanStart', this.onScanStart.bind(this));
-      this.bleService.on('scanStop', this.onScanStop.bind(this));
-      this.bleService.on('discover', this.onScanResult.bind(this));
-      // wait for adapter to become ready
+      this.bleService.on("scanStart", this.onScanStart.bind(this));
+      this.bleService.on("scanStop", this.onScanStop.bind(this));
+      this.bleService.on("discover", this.onScanResult.bind(this));
+
       let counter = 5;
       do {
         await sleep(500);
@@ -89,9 +97,6 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   stopBTService(): boolean {
     if (this.bleService != null) {
       this.stopScanLock();
-      // Detach the scanner's listeners (incl. those on the global noble
-      // singleton) before dropping the reference, otherwise each
-      // prepare/stop cycle leaks them.
       this.bleService.destroy();
       this.bleService = null;
     }
@@ -116,14 +121,9 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   async startMonitor(): Promise<boolean> {
     if (this.bleService == null) return false;
-    // Never interrupt an in-progress / requested manual scan.
     if (this.scanning) return false;
-    // Already actively monitoring — idempotent success.
     if (this.monitoring && this.bleService.isScanning()) return true;
-    // Re-arm. A silent gateway drop can leave `monitoring` stuck true with no
-    // matching scanStop (the scanner never reported stopping), which made the
-    // old `!this.monitoring` guard turn this into a permanent no-op — the
-    // monitor stayed dead until a manual scan. Reset and (re)start instead.
+
     this.monitoring = true;
     this.monitoring = await this.bleService.startScan(true);
     return this.monitoring;
@@ -131,9 +131,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   async stopMonitor(): Promise<boolean> {
     if (this.bleService == null) return false;
-    // Always clear the flag, even when the scanner no longer reports
-    // 'scanning' (e.g. after a silent gateway drop). The old early-return left
-    // `monitoring` true forever, wedging every subsequent startMonitor().
+
     this.monitoring = false;
     if (this.bleService.isScanning()) {
       return await this.bleService.stopScan();
@@ -178,44 +176,43 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   private onScanStart(): void {
     if (this.scanning) {
-      this.emit('scanStart');
+      this.emit("scanStart");
     } else if (this.monitoring) {
-      this.emit('monitorStart');
+      this.emit("monitorStart");
     }
   }
 
   private onScanStop(): void {
     if (this.scanning) {
-      this.emit('scanStop');
+      this.emit("scanStop");
       this.scanning = false;
     } else if (this.monitoring) {
-      this.emit('monitorStop');
+      this.emit("monitorStop");
       this.monitoring = false;
     }
   }
 
   private onScanResult(device: TTBluetoothDevice): void {
-    // Is it a Lock device ?
     if (device.lockType != LockType.UNKNOWN) {
       if (!this.lockDevices.has(device.address)) {
         const data = this.lockData.get(device.address);
         const lock = new TTLock(device, data);
         this.lockDevices.set(device.address, lock);
-        lock.on('dataUpdated', (lock) => {
+        lock.on("dataUpdated", (lock) => {
           const lockData = lock.getLockData();
           if (lockData != undefined) {
             this.lockData.set(lockData.address, lockData);
-            this.emit('updatedLockData');
+            this.emit("updatedLockData");
           }
         });
-        lock.on('lockReset', (address, id) => {
+        lock.on("lockReset", (address, id) => {
           this.lockData.delete(address);
           this.lockDevices.delete(address);
           this.bleService?.forgetDevice(id);
-          this.emit('updatedLockData');
+          this.emit("updatedLockData");
         });
 
-        this.emit('foundLock', lock);
+        this.emit("foundLock", lock);
       }
     }
   }
