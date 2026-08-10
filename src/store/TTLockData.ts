@@ -19,4 +19,9 @@ export interface TTLockData {
   lockedStatus: number;
   privateData: TTLockPrivateData;
   operationLog?: LogEntry[];
+  /**
+   * Sequences the firmware reported as non-existent. Persisted so the operation-log
+   * backfill does not re-probe permanently empty gaps after every restart.
+   */
+  missingSequences?: number[];
 }

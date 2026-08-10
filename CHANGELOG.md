@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.7.4]
+
+### Fixed — `getOperationLog(all)` backfill could outlive the BLE session
+
+The missing-gap backfill was the only phase of `getOperationLog(true, …)` with no
+`isConnected()` guard and no time bound, and it re-walked the same gaps on every call.
+On a lock whose cached journal is capped by the caller (only the most recent entries are
+persisted), the missing-sequence list holds thousands of records the firmware no longer
+has — the journal is circular, so those gaps never close. The loop then kept issuing
+commands long after the lock had dropped the link and after the caller had given up,
+colliding with the next session (`Command already in progress` → `macro_adminLogin`
+fails → the caller sees a cached journal it cannot distinguish from a real read).
+
+- The backfill now stops as soon as the link drops or its time budget is spent.
+- Sequences the firmware answers with its "no record" sentinel are remembered in
+  `missingSequences` (persisted in `TTLockData`, capped at
+  `TTLock.MAX_MISSING_SEQUENCES`, cleared by `resetLock()`) and are never requested
+  again.
+- New optional third argument, backwards compatible:
+  `getOperationLog(all, noCache, { skipBackfill?, maxProbeEmpty?, maxDurationMs? })`.
+  Callers on a hot path should pass `skipBackfill: true`; `maxDurationMs` defaults to
+  5 minutes and also bounds the appended-record probe.
+
+### Fixed — a gateway drop before authentication left the monitor unrecoverable
+
+`NobleWebsocketBinding.onClose()` only announced `stateChange('poweredOff')` when the
+authenticated `poweredOn` had already been received. A link that died during connection
+or authentication therefore dropped silently: no `poweredOff`, so no `scanStop`, so
+`NobleScanner` kept `scannerState` at `"scanning"` and `TTLockClient` kept `monitoring`
+true while nothing was listening.
+
+Every recovery path trusts that pair — `isMonitoring()` returned true and
+`startMonitor()` short-circuited on its idempotence guard — so the monitor stayed dead
+with no way back short of a restart. The state change is now announced unconditionally;
+`NobleScanner` ignores the transition unless it was actually scanning.
+
+Also restored the explanatory comments around `startMonitor`/`stopMonitor` and
+`stopBTService` that were dropped in 0.7.2 — the code was unchanged, but the reasoning
+behind the `&& isScanning()` guard is not deducible from it.
+
 ## [0.7.2]
 
 ### Fixed — audit P0/P1 (correctness, data integrity, resource leaks)

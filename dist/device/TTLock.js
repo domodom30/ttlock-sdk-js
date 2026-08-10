@@ -640,6 +640,9 @@ class TTLock extends TTLockApi_1.TTLockApi {
             log.error('Error while reseting the lock', error);
             return false;
         }
+        // The firmware restarts its record counter from zero after a reset, so the sequences
+        // recorded as permanently absent no longer describe anything real.
+        this.missingSequences.clear();
         await this.disconnect();
         this.emit('lockReset', this.device.address, this.device.id);
         return true;
@@ -1373,7 +1376,25 @@ class TTLock extends TTLockApi_1.TTLockApi {
         }
         return this.remoteUnlock;
     }
-    async getOperationLog(all = false, noCache = false) {
+    /**
+     * Read the operation log.
+     *
+     * @param all      also reconcile the full journal (probe for appended records, then
+     *                 backfill missing sequences) instead of returning only what the
+     *                 firmware's 0xffff stream produced.
+     * @param noCache  start from the freshly-read records instead of the cached journal.
+     * @param options  bounds for the `all` mode. The backfill is by far the expensive
+     *                 phase: on a lock whose cached journal is capped (callers routinely
+     *                 persist only the most recent entries) the missing-sequence list can
+     *                 hold thousands of records the firmware no longer has — the journal
+     *                 is circular, so those gaps never close and every call re-walks them.
+     *                 Left unbounded it outlives the BLE session and keeps issuing
+     *                 commands after the caller gave up, colliding with the next session
+     *                 ("Command already in progress"). Callers on a hot path should pass
+     *                 `skipBackfill: true`.
+     */
+    async getOperationLog(all = false, noCache = false, options = {}) {
+        var _a, _b;
         if (!this.initialized) {
             return [];
         }
@@ -1445,6 +1466,9 @@ class TTLock extends TTLockApi_1.TTLockApi {
         }
         // if all operations were requested
         if (all) {
+            // Budget for the probe + backfill phases below. Default generous (the manual
+            // "reload everything" path legitimately takes minutes); hot paths pass their own.
+            const deadline = Date.now() + ((_a = options.maxDurationMs) !== null && _a !== void 0 ? _a : 5 * 60 * 1000);
             let operations = [];
             let maxRecordNumber = 0;
             if (noCache) {
@@ -1521,9 +1545,14 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 } while (keepGoing && retry < maxRetry);
             }
             else {
-                // if we have operations, compute missing record numbers (cheap, no BLE)
+                // if we have operations, compute missing record numbers (cheap, no BLE).
+                // Sequences already known to be absent from the firmware are skipped: they were
+                // answered with the "no record" sentinel on an earlier call and the journal is
+                // circular, so they will never come back.
                 let missing = [];
                 for (let i = 0; i < maxRecordNumber; i++) {
+                    if (this.missingSequences.has(i))
+                        continue;
                     if (typeof operations[i] == 'undefined' || operations[i] == null) {
                         missing.push(i);
                     }
@@ -1540,10 +1569,10 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 // record (recordNumber <= maxRecordNumber, typically the init record
                 // at recordNumber=1 with nextSeq=2). Treat those as "empty" so the
                 // sweep can terminate.
-                const probeMaxConsecutiveEmpty = 20;
+                const probeMaxConsecutiveEmpty = (_b = options.maxProbeEmpty) !== null && _b !== void 0 ? _b : 20;
                 let probeSeq = maxRecordNumber + 1;
                 let consecutiveEmpty = 0;
-                while (consecutiveEmpty < probeMaxConsecutiveEmpty && this.isConnected()) {
+                while (consecutiveEmpty < probeMaxConsecutiveEmpty && this.isConnected() && Date.now() < deadline) {
                     log('========= get OperationLog probe', probeSeq);
                     let producedNewRecord = false;
                     try {
@@ -1571,31 +1600,49 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     }
                     probeSeq++;
                 }
-                // Backfill old gaps last (best-effort). May run on a degraded/
-                // disconnected link — getOperationLogCommand then fails and the gap
-                // is skipped, which is acceptable since new records were already
-                // captured by the probe above.
-                for (let sequence of missing) {
-                    let retry = 0;
-                    let success = false;
-                    do {
-                        log('========= get OperationLog', sequence);
-                        try {
-                            const response = await this.getOperationLogCommand(sequence);
-                            for (let log of response.data) {
-                                operations[log.recordNumber] = log;
-                            }
-                            retry = 0;
-                            success = true;
+                // Backfill old gaps last (best-effort). Bounded three ways, because this loop
+                // used to be the single most expensive thing the SDK could do: it walked every
+                // missing sequence on every call, kept running after the lock had dropped the
+                // link, and re-tried sequences the firmware had already declared non-existent.
+                //  - skipBackfill: callers on a hot path opt out entirely;
+                //  - isConnected(): a dead link ends the sweep instead of burning it out;
+                //  - deadline: a live but slow link can't monopolise the session either.
+                // Sequences the firmware answers with its "no record" sentinel are remembered in
+                // missingSequences and never requested again — the journal is circular, so those
+                // gaps are permanent.
+                if (!options.skipBackfill) {
+                    for (let sequence of missing) {
+                        if (!this.isConnected() || Date.now() >= deadline) {
+                            log('========= get OperationLog backfill stopped', sequence);
+                            break;
                         }
-                        catch (error) {
-                            // Sentinel: this record genuinely doesn't exist on the lock — give up on it
-                            if (error instanceof TTLockApi_1.NoMoreOperationDataError) {
-                                break;
+                        let retry = 0;
+                        let success = false;
+                        do {
+                            log('========= get OperationLog', sequence);
+                            try {
+                                const response = await this.getOperationLogCommand(sequence);
+                                for (let log of response.data) {
+                                    operations[log.recordNumber] = log;
+                                }
+                                retry = 0;
+                                success = true;
                             }
-                            retry++;
-                        }
-                    } while (!success && retry < maxRetry);
+                            catch (error) {
+                                // Sentinel: this record genuinely doesn't exist on the lock — give up on
+                                // it, now and for every future call. Capped so the persisted set stays
+                                // bounded on locks with a very long history; past the cap the backfill
+                                // simply degrades to its previous re-probing behaviour.
+                                if (error instanceof TTLockApi_1.NoMoreOperationDataError) {
+                                    if (this.missingSequences.size < TTLock.MAX_MISSING_SEQUENCES) {
+                                        this.missingSequences.add(sequence);
+                                    }
+                                    break;
+                                }
+                                retry++;
+                            }
+                        } while (!success && retry < maxRetry);
+                    }
                 }
             }
             // Only update the cached log if we actually got data — never overwrite with empty
@@ -1732,7 +1779,8 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 autoLockTime: this.autoLockTime ? this.autoLockTime : -1,
                 lockedStatus: this.lockedStatus,
                 privateData: privateData,
-                operationLog: this.operationLog
+                operationLog: this.operationLog,
+                missingSequences: Array.from(this.missingSequences)
             };
             return data;
         }
@@ -1777,3 +1825,5 @@ class TTLock extends TTLockApi_1.TTLockApi {
     }
 }
 exports.TTLock = TTLock;
+/** Upper bound on the persisted set of known-absent operation-log sequences. */
+TTLock.MAX_MISSING_SEQUENCES = 10000;

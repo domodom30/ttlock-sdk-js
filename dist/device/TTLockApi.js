@@ -62,6 +62,7 @@ class TTLockApi extends events_1.EventEmitter {
         this.rssi = this.device.rssi;
         this.initialized = false; // just workaround for TypeScript
         this.operationLog = [];
+        this.missingSequences = new Set();
         if (typeof data != 'undefined') {
             this.updateLockData(data);
         }
@@ -102,6 +103,9 @@ class TTLockApi extends events_1.EventEmitter {
         this.privateData.pwdInfo = privateData.pwdInfo;
         if (typeof data.operationLog != 'undefined') {
             this.operationLog = data.operationLog;
+        }
+        if (typeof data.missingSequences != 'undefined') {
+            this.missingSequences = new Set(data.missingSequences);
         }
         this.initialized = true;
     }

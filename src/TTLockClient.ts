@@ -84,6 +84,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
       this.bleService.on("scanStop", this.onScanStop.bind(this));
       this.bleService.on("discover", this.onScanResult.bind(this));
 
+      // wait for adapter to become ready
       let counter = 5;
       do {
         await sleep(500);
@@ -97,6 +98,9 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   stopBTService(): boolean {
     if (this.bleService != null) {
       this.stopScanLock();
+      // Detach the scanner's listeners (incl. those on the global noble
+      // singleton) before dropping the reference, otherwise each
+      // prepare/stop cycle leaks them.
       this.bleService.destroy();
       this.bleService = null;
     }
@@ -121,9 +125,17 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   async startMonitor(): Promise<boolean> {
     if (this.bleService == null) return false;
+    // Never interrupt an in-progress / requested manual scan.
     if (this.scanning) return false;
+    // Already actively monitoring — idempotent success. Note this trusts
+    // `isScanning()`, i.e. the scanner's own view of itself: a transport that dies
+    // without reporting it would make this guard lie. Keeping that view honest is the
+    // transport's job (see NobleWebsocketBinding.onClose).
     if (this.monitoring && this.bleService.isScanning()) return true;
-
+    // Re-arm. A silent gateway drop can leave `monitoring` stuck true with no
+    // matching scanStop (the scanner never reported stopping), which made the
+    // old `!this.monitoring` guard turn this into a permanent no-op — the
+    // monitor stayed dead until a manual scan. Reset and (re)start instead.
     this.monitoring = true;
     this.monitoring = await this.bleService.startScan(true);
     return this.monitoring;
@@ -131,7 +143,9 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
 
   async stopMonitor(): Promise<boolean> {
     if (this.bleService == null) return false;
-
+    // Always clear the flag, even when the scanner no longer reports
+    // 'scanning' (e.g. after a silent gateway drop). The old early-return left
+    // `monitoring` true forever, wedging every subsequent startMonitor().
     this.monitoring = false;
     if (this.bleService.isScanning()) {
       return await this.bleService.stopScan();
@@ -193,6 +207,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   }
 
   private onScanResult(device: TTBluetoothDevice): void {
+    // Is it a Lock device ?
     if (device.lockType != LockType.UNKNOWN) {
       if (!this.lockDevices.has(device.address)) {
         const data = this.lockData.get(device.address);

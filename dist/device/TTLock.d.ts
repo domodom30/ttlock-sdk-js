@@ -26,6 +26,8 @@ export interface TTLock {
     on(event: 'scanFRProgress', listener: (lock: TTLock) => void): this;
 }
 export declare class TTLock extends TTLockApi implements TTLock {
+    /** Upper bound on the persisted set of known-absent operation-log sequences. */
+    static readonly MAX_MISSING_SEQUENCES = 10000;
     private connected;
     private skipDataRead;
     private connecting;
@@ -253,7 +255,31 @@ export declare class TTLock extends TTLockApi implements TTLock {
      * @param type
      */
     setRemoteUnlock(type?: ConfigRemoteUnlock.OP_CLOSE | ConfigRemoteUnlock.OP_OPEN): Promise<ConfigRemoteUnlock.OP_CLOSE | ConfigRemoteUnlock.OP_OPEN | undefined>;
-    getOperationLog(all?: boolean, noCache?: boolean): Promise<LogEntry[]>;
+    /**
+     * Read the operation log.
+     *
+     * @param all      also reconcile the full journal (probe for appended records, then
+     *                 backfill missing sequences) instead of returning only what the
+     *                 firmware's 0xffff stream produced.
+     * @param noCache  start from the freshly-read records instead of the cached journal.
+     * @param options  bounds for the `all` mode. The backfill is by far the expensive
+     *                 phase: on a lock whose cached journal is capped (callers routinely
+     *                 persist only the most recent entries) the missing-sequence list can
+     *                 hold thousands of records the firmware no longer has — the journal
+     *                 is circular, so those gaps never close and every call re-walks them.
+     *                 Left unbounded it outlives the BLE session and keeps issuing
+     *                 commands after the caller gave up, colliding with the next session
+     *                 ("Command already in progress"). Callers on a hot path should pass
+     *                 `skipBackfill: true`.
+     */
+    getOperationLog(all?: boolean, noCache?: boolean, options?: {
+        /** Skip the missing-gap backfill entirely (probe for appended records only). */
+        skipBackfill?: boolean;
+        /** Consecutive empty probes before the appended-record sweep stops. Default 20. */
+        maxProbeEmpty?: number;
+        /** Wall-clock budget for the probe + backfill phases. Default 5 min. */
+        maxDurationMs?: number;
+    }): Promise<LogEntry[]>;
     /**
      * Probe a single operation log sequence directly, bypassing all cache logic.
      * Intended for debugging firmware behavior at specific sequence numbers.

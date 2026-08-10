@@ -111,11 +111,20 @@ export class NobleWebsocketBinding extends EventEmitter {
     const wasConnected = this.connected;
     this.connected = false;
     this.wasReady = false;
-    log(chalk.red("Websocket disconnected"));
+    log(
+      chalk.red("Websocket disconnected"),
+      wasConnected ? "" : "(before authentication)",
+    );
 
-    if (wasConnected) {
-      this.emit("stateChange", "poweredOff");
-    }
+    // Announced unconditionally, including when the link died before the
+    // authenticated 'poweredOn' ever arrived (`connected` still false). Gating this on
+    // `wasConnected` produced a silent drop: no 'poweredOff' meant no 'scanStop', so
+    // NobleScanner kept scannerState "scanning" and TTLockClient kept monitoring true
+    // while nothing was listening. Every repair path trusts that pair — isMonitoring()
+    // returned true, startMonitor() short-circuited on its idempotence guard — so the
+    // monitor stayed dead with no way back. Emitting always keeps the observable state
+    // honest; NobleScanner ignores the transition unless it was actually scanning.
+    this.emit("stateChange", "poweredOff");
     for (const [peripheralUuid, peripheral] of this.peripherals) {
       if (peripheral.connected) {
         peripheral.connected = false;

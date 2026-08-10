@@ -150,6 +150,12 @@ export abstract class TTLockApi extends EventEmitter {
   protected newEvents: boolean;
   protected deviceInfo?: DeviceInfoType;
   protected operationLog: LogEntry[];
+  /**
+   * Sequences the firmware answered with its "no record" sentinel. The operation log is
+   * circular, so a gap below the current maximum is permanent: remembering these keeps
+   * getOperationLog's backfill from re-requesting them on every single call.
+   */
+  protected missingSequences: Set<number>;
 
   // sensitive data
   protected privateData: PrivateDataType;
@@ -170,6 +176,7 @@ export abstract class TTLockApi extends EventEmitter {
     this.rssi = this.device.rssi;
     this.initialized = false; // just workaround for TypeScript
     this.operationLog = [];
+    this.missingSequences = new Set();
     if (typeof data != 'undefined') {
       this.updateLockData(data);
     } else {
@@ -211,6 +218,9 @@ export abstract class TTLockApi extends EventEmitter {
     this.privateData.pwdInfo = privateData.pwdInfo;
     if (typeof data.operationLog != 'undefined') {
       this.operationLog = data.operationLog;
+    }
+    if (typeof data.missingSequences != 'undefined') {
+      this.missingSequences = new Set(data.missingSequences);
     }
     this.initialized = true;
   }

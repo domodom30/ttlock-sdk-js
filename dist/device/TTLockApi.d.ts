@@ -68,6 +68,12 @@ export declare abstract class TTLockApi extends EventEmitter {
     protected newEvents: boolean;
     protected deviceInfo?: DeviceInfoType;
     protected operationLog: LogEntry[];
+    /**
+     * Sequences the firmware answered with its "no record" sentinel. The operation log is
+     * circular, so a gap below the current maximum is permanent: remembering these keeps
+     * getOperationLog's backfill from re-requesting them on every single call.
+     */
+    protected missingSequences: Set<number>;
     protected privateData: PrivateDataType;
     constructor(device: TTBluetoothDevice, data?: TTLockData);
     updateFromTTDevice(): void;
