@@ -1899,10 +1899,11 @@ export class TTLock extends TTLockApi implements TTLock {
           log('========= autoLockTime:', this.autoLockTime);
         }
 
-        if (this.lockedStatus == LockedStatus.UNKNOWN) {
+        if (this.lockedStatus == LockedStatus.UNKNOWN || this.statusUnverified) {
           // Locked/unlocked status
           log('========= check lock status');
           this.lockedStatus = await this.searchBycicleStatusCommand();
+          this.statusUnverified = false;
           log('========= check lock status', this.lockedStatus);
         }
 
