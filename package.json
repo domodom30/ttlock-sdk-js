@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "rm -rf ./dist && tsc",
+    "prepare": "npm run build",
     "init": "npm run build && node ./examples/init.js",
     "reset": "npm run build && node ./examples/reset.js",
     "unlock": "npm run build && node ./examples/unlock.js",
