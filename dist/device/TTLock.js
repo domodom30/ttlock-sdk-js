@@ -1719,10 +1719,11 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     this.autoLockTime = await this.searchAutoLockTimeCommand();
                     log('========= autoLockTime:', this.autoLockTime);
                 }
-                if (this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN) {
+                if (this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN || this.statusUnverified) {
                     // Locked/unlocked status
                     log('========= check lock status');
                     this.lockedStatus = await this.searchBycicleStatusCommand();
+                    this.statusUnverified = false;
                     log('========= check lock status', this.lockedStatus);
                 }
                 if (this.featureList.has(FeatureValue_1.FeatureValue.AUDIO_MANAGEMENT) && this.lockSound == AudioManage_1.AudioManage.UNKNOWN) {

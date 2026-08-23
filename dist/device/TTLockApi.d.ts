@@ -67,6 +67,14 @@ export declare abstract class TTLockApi extends EventEmitter {
     protected lockedStatus: LockedStatus;
     protected newEvents: boolean;
     protected deviceInfo?: DeviceInfoType;
+    /**
+     * The BLE advertising 'isUnlock' bit only reliably signals "an unlock just
+     * happened" - it clears on its own after a short interval regardless of
+     * whether the door was ever re-locked (especially with autolock disabled).
+     * When it clears, we can no longer trust lockedStatus without an active
+     * status query, so we flag it here instead of assuming LOCKED.
+     */
+    protected statusUnverified: boolean;
     protected operationLog: LogEntry[];
     /**
      * Sequences the firmware answered with its "no record" sentinel. The operation log is
