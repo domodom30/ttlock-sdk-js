@@ -50,7 +50,7 @@ class GetKeyboardPasswordsCommand extends Command_1.Command {
         }
     }
     build() {
-        if (typeof this.sequence != "undefined") {
+        if (this.sequence !== undefined) {
             const data = Buffer.alloc(2);
             data.writeUInt16BE(this.sequence);
             return data;

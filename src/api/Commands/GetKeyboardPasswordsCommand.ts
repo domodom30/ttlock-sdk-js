@@ -13,7 +13,7 @@ export interface KeyboardPassCode {
 }
 
 export class GetKeyboardPasswordsCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_PWD_LIST;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_PWD_LIST;
 
   private sequence?: number;
   private passCodes?: KeyboardPassCode[];
@@ -68,7 +68,7 @@ export class GetKeyboardPasswordsCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.sequence != "undefined") {
+    if (this.sequence !== undefined) {
       const data = Buffer.alloc(2);
       data.writeUInt16BE(this.sequence);
       return data;

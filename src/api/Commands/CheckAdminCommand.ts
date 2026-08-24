@@ -4,7 +4,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class CheckAdminCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_CHECK_ADMIN;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_CHECK_ADMIN;
 
   private uid: number = 0;
   private adminPs?: number;
@@ -15,7 +15,7 @@ export class CheckAdminCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.adminPs != "undefined") {
+    if (this.adminPs !== undefined) {
       const data = Buffer.alloc(11);
       // lockFlagPos (4 bytes at offset 3) is written first, then adminPs (4 bytes
       // at offset 0) overwrites byte 3 with its last byte. Correct only because

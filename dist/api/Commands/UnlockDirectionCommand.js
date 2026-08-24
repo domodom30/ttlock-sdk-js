@@ -36,7 +36,7 @@ class UnlockDirectionCommand extends Command_1.Command {
         }
     }
     build() {
-        if (this.opType === 0x02 && typeof this.direction !== 'undefined') {
+        if (this.opType === 0x02 && this.direction !== undefined) {
             return Buffer.from([this.opType, this.direction]);
         }
         return Buffer.from([this.opType]);

@@ -7,7 +7,7 @@ export interface UnlockDataInterface {
     batteryCapacity?: number;
 }
 export declare class UnlockCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private sum?;
     private uid?;
     private uniqueid?;

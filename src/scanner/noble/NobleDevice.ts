@@ -77,43 +77,59 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
   }
 
   async connect(timeout: number = 10): Promise<boolean> {
-    if (this.connectable && !this.connected && !this.connecting) {
-      if (this.peripheral.state == "connected") {
-        this.connected = true;
-        return true;
-      }
-      this.connecting = true;
-      log("Peripheral connect start");
-      this.peripheral.connect((error) => {
-        if (typeof error != "undefined" && error != null) {
-          log("Peripheral connect error:", error);
-        } else {
-          log("Peripheral state:", this.peripheral.state);
-          if (this.peripheral.state == "connected") {
-            this.connected = true;
-            this.connecting = false;
-          }
-        }
-      });
-      let timeoutCycles = timeout * 10;
-      do {
-        await sleep(100);
-        timeoutCycles--;
-      } while (!this.connected && timeoutCycles > 0 && this.connecting);
-      await sleep(10);
-      if (!this.connected) {
-        this.connecting = false;
-        try {
-          this.peripheral.cancelConnect();
-        } catch (error) {}
-        return false;
-      }
-      log("Device emiting connected");
-      this.emit("connected");
+    if (!this.connectable || this.connected || this.connecting) {
+      log("Peripheral state:", this.peripheral.state);
+      return false;
+    }
+    if (this.peripheral.state == "connected") {
+      this.connected = true;
       return true;
     }
-    log("Peripheral state:", this.peripheral.state);
-    return false;
+    this.connecting = true;
+    log("Peripheral connect start");
+
+    // Settle on the native connect callback (success or error) rather than
+    // polling: this resolves as soon as the outcome is known, and clearing the
+    // timeout guarantees a connection that completes in time is never torn down
+    // by cancelConnect. A late success after the timeout has fired is ignored
+    // (already cancelled); onDisconnect then cleans up the flags.
+    const connected = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        log("Peripheral connect timeout");
+        try {
+          this.peripheral.cancelConnect();
+        } catch (error) { /* swallow */ }
+        resolve(false);
+      }, timeout * 1000);
+
+      this.peripheral.connect((error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        if (error !== undefined && error != null) {
+          log("Peripheral connect error:", error);
+          resolve(false);
+        } else {
+          log("Peripheral state:", this.peripheral.state);
+          resolve(this.peripheral.state == "connected");
+        }
+      });
+    });
+
+    if (!connected) {
+      this.connecting = false;
+      return false;
+    }
+    this.connected = true;
+    this.connecting = false;
+    log("Device emiting connected");
+    this.emit("connected");
+    return true;
   }
 
   async disconnect(): Promise<boolean> {
@@ -210,7 +226,7 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
           if (characteristic.properties.includes("read")) {
             log("Reading", uuid);
             const data = await characteristic.read();
-            if (typeof data != "undefined") {
+            if (data !== undefined) {
               log("Data", data.toString("ascii"));
             }
           }

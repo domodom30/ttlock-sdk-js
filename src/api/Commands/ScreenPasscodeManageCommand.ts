@@ -5,7 +5,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class ScreenPasscodeManageCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_SHOW_PASSWORD;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_SHOW_PASSWORD;
 
   private opType: ActionType.GET | ActionType.SET = ActionType.GET;
   private opValue?: 0 | 1; // lockData.displayPasscode
@@ -26,7 +26,7 @@ export class ScreenPasscodeManageCommand extends Command {
   build(): Buffer {
     if (this.opType == ActionType.GET) {
       return Buffer.from([this.opType]);
-    } else if (this.opType == ActionType.SET && typeof this.opValue != "undefined") {
+    } else if (this.opType == ActionType.SET && this.opValue !== undefined) {
       return Buffer.from([this.opType, this.opValue]);
     } else {
       return Buffer.from([]);

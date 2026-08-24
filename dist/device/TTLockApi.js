@@ -47,6 +47,14 @@ class TTLockApi extends events_1.EventEmitter {
     constructor(device, data) {
         super();
         this.adminAuth = false;
+        /**
+         * The BLE advertising 'isUnlock' bit only reliably signals "an unlock just
+         * happened" - it clears on its own after a short interval regardless of
+         * whether the door was ever re-locked (especially with autolock disabled).
+         * When it clears, we can no longer trust lockedStatus without an active
+         * status query, so we flag it here instead of assuming LOCKED.
+         */
+        this.statusUnverified = false;
         this.device = device;
         this.privateData = {};
         if (this.device.isUnlock) {
@@ -63,7 +71,7 @@ class TTLockApi extends events_1.EventEmitter {
         this.initialized = false; // just workaround for TypeScript
         this.operationLog = [];
         this.missingSequences = new Set();
-        if (typeof data != 'undefined') {
+        if (data !== undefined) {
             this.updateLockData(data);
         }
         else {
@@ -83,10 +91,15 @@ class TTLockApi extends events_1.EventEmitter {
         if (this.device.isUnlock) {
             paramsChanged.lockedStatus = this.lockedStatus != LockedStatus_1.LockedStatus.UNLOCKED;
             this.lockedStatus = LockedStatus_1.LockedStatus.UNLOCKED;
+            this.statusUnverified = false;
         }
         else {
-            paramsChanged.lockedStatus = this.lockedStatus != LockedStatus_1.LockedStatus.LOCKED;
-            this.lockedStatus = LockedStatus_1.LockedStatus.LOCKED;
+            // Don't trust "bit cleared" as proof the lock re-engaged - that only
+            // holds true if autolock is on. Leave lockedStatus as-is and require
+            // an active query on next connect to confirm the real state.
+            if (this.lockedStatus == LockedStatus_1.LockedStatus.UNLOCKED) {
+                this.statusUnverified = true;
+            }
         }
         if (paramsChanged.batteryCapacity || paramsChanged.lockedStatus || paramsChanged.newEvents) {
             log('Emmiting paramsChanged', paramsChanged);
@@ -101,10 +114,10 @@ class TTLockApi extends events_1.EventEmitter {
         this.privateData.admin = privateData.admin;
         this.privateData.adminPasscode = privateData.adminPasscode;
         this.privateData.pwdInfo = privateData.pwdInfo;
-        if (typeof data.operationLog != 'undefined') {
+        if (data.operationLog !== undefined) {
             this.operationLog = data.operationLog;
         }
-        if (typeof data.missingSequences != 'undefined') {
+        if (data.missingSequences !== undefined) {
             this.missingSequences = new Set(data.missingSequences);
         }
         this.initialized = true;
@@ -157,7 +170,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send AddAdmin command
      */
     async addAdminCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -190,7 +203,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send CalibrationTime command
      */
     async calibrateTimeCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -244,7 +257,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send SearchDeviceFeature command
      */
     async searchDeviceFeatureCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -274,7 +287,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send AudioManage command to get or set the audio feedback
      */
     async audioManageCommand(newValue, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -284,7 +297,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_AUDIO_MANAGE);
-        if (typeof newValue != 'undefined') {
+        if (newValue !== undefined) {
             const cmd = requestEnvelope.getCommand();
             cmd.setNewValue(newValue);
         }
@@ -296,12 +309,12 @@ class TTLockApi extends events_1.EventEmitter {
                 throw new Error('Failed to set audio mode');
             }
             this.batteryCapacity = cmd.getBatteryCapacity();
-            if (typeof newValue != 'undefined') {
+            if (newValue !== undefined) {
                 return newValue;
             }
             else {
                 const value = cmd.getValue();
-                if (typeof value != 'undefined') {
+                if (value !== undefined) {
                     return value;
                 }
                 else {
@@ -318,7 +331,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Requires FeatureValue.ACCESSORY_BATTERY in the lock's feature list.
      */
     async getAccessoryBatteryCommand(type, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -348,7 +361,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Requires FeatureValue.UNLOCK_DIRECTION in the lock's feature list.
      */
     async unlockDirectionCommand(newValue, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -358,7 +371,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_UNLOCK_DIRECTION);
-        if (typeof newValue !== 'undefined') {
+        if (newValue !== undefined) {
             const cmd = requestEnvelope.getCommand();
             cmd.setDirection(newValue);
         }
@@ -369,11 +382,11 @@ class TTLockApi extends events_1.EventEmitter {
             if (resp.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
                 throw new Error('Failed to get/set unlock direction');
             }
-            if (typeof newValue !== 'undefined') {
+            if (newValue !== undefined) {
                 return newValue;
             }
             const dir = resp.getDirection();
-            if (typeof dir !== 'undefined') {
+            if (dir !== undefined) {
                 return dir;
             }
             throw new Error('Unable to get unlock direction value');
@@ -386,7 +399,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send ScreenPasscodeManage command to get or set password display
      */
     async screenPasscodeManageCommand(newValue, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -396,7 +409,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_SHOW_PASSWORD);
-        if (typeof newValue != 'undefined') {
+        if (newValue !== undefined) {
             const cmd = requestEnvelope.getCommand();
             cmd.setNewValue(newValue);
         }
@@ -407,7 +420,7 @@ class TTLockApi extends events_1.EventEmitter {
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
                 throw new Error('Failed to set screenPasscode mode');
             }
-            if (typeof newValue != 'undefined') {
+            if (newValue !== undefined) {
                 return newValue;
             }
             else {
@@ -425,7 +438,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async searchAutoLockTimeCommand(newValue, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -435,7 +448,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_AUTO_LOCK_MANAGE);
-        if (typeof newValue != 'undefined') {
+        if (newValue !== undefined) {
             const cmd = requestEnvelope.getCommand();
             cmd.setTime(newValue);
         }
@@ -456,7 +469,7 @@ class TTLockApi extends events_1.EventEmitter {
         throw new Error('Method not implemented.');
     }
     async getAdminCodeCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -491,7 +504,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send SetAdminKeyboardPwd
      */
     async setAdminKeyboardPwdCommand(adminPasscode, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -499,7 +512,7 @@ class TTLockApi extends events_1.EventEmitter {
                 throw new Error('No AES key for lock');
             }
         }
-        if (typeof adminPasscode == 'undefined') {
+        if (adminPasscode === undefined) {
             adminPasscode = '';
             for (let i = 0; i < 7; i++) {
                 adminPasscode += Math.floor(Math.random() * 10).toString();
@@ -532,7 +545,7 @@ class TTLockApi extends events_1.EventEmitter {
      * itself succeeds, you have a keyboard-based recovery path without resorting to a hardware reset.
      */
     async setEraseKeyboardPwdCommand(erasePasscode, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -563,7 +576,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send InitPasswords command
      */
     async initPasswordsCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -598,7 +611,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send ControlRemoteUnlock command to activate or disactivate remote unlock (via gateway?)
      */
     async controlRemoteUnlockCommand(newValue, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -608,7 +621,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_CONTROL_REMOTE_UNLOCK);
-        if (typeof newValue != 'undefined') {
+        if (newValue !== undefined) {
             const cmd = requestEnvelope.getCommand();
             cmd.setNewValue(newValue);
         }
@@ -619,13 +632,13 @@ class TTLockApi extends events_1.EventEmitter {
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
                 throw new Error('Failed to set remote unlock');
             }
-            if (typeof newValue != 'undefined') {
+            if (newValue !== undefined) {
                 return newValue;
             }
             else {
                 this.batteryCapacity = cmd.getBatteryCapacity();
                 const value = cmd.getValue();
-                if (typeof value != 'undefined') {
+                if (value !== undefined) {
                     return value;
                 }
                 else {
@@ -641,7 +654,7 @@ class TTLockApi extends events_1.EventEmitter {
      * Send OperateFinished command
      */
     async operateFinishedCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -664,7 +677,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async readDeviceInfoCommand(infoType, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -697,7 +710,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async checkAdminCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -705,7 +718,7 @@ class TTLockApi extends events_1.EventEmitter {
                 throw new Error('No AES key for lock');
             }
         }
-        if (typeof this.privateData.admin == 'undefined' || typeof this.privateData.admin.adminPs == 'undefined') {
+        if (this.privateData.admin === undefined || this.privateData.admin.adminPs === undefined) {
             throw new Error('Admin data is not set');
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
@@ -726,7 +739,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async checkRandomCommand(psFromLock, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -734,7 +747,7 @@ class TTLockApi extends events_1.EventEmitter {
                 throw new Error('No AES key for lock');
             }
         }
-        if (typeof this.privateData.admin == 'undefined' || typeof this.privateData.admin.unlockKey == 'undefined') {
+        if (this.privateData.admin === undefined || this.privateData.admin.unlockKey === undefined) {
             throw new Error('Admin data is not set');
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
@@ -754,7 +767,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async resetLockCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -773,7 +786,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async checkUserTime(startDate = '0001311400', endDate = '9911301400', aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -799,7 +812,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async unlockCommand(psFromLock, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -807,7 +820,7 @@ class TTLockApi extends events_1.EventEmitter {
                 throw new Error('No AES key for lock');
             }
         }
-        if (typeof this.privateData.admin == 'undefined' || typeof this.privateData.admin.unlockKey == 'undefined') {
+        if (this.privateData.admin === undefined || this.privateData.admin.unlockKey === undefined) {
             throw new Error('Admin data is not set');
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
@@ -845,7 +858,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async lockCommand(psFromLock, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -853,7 +866,7 @@ class TTLockApi extends events_1.EventEmitter {
                 throw new Error('No AES key for lock');
             }
         }
-        if (typeof this.privateData.admin == 'undefined' || typeof this.privateData.admin.unlockKey == 'undefined') {
+        if (this.privateData.admin === undefined || this.privateData.admin.unlockKey === undefined) {
             throw new Error('Admin data is not set');
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
@@ -894,7 +907,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async getPassageModeCommand(sequence = 0, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -923,7 +936,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async setPassageModeCommand(data, type = PassageModeOperate_1.PassageModeOperate.ADD, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -949,7 +962,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async clearPassageModeCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -975,7 +988,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async searchBycicleStatusCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -999,7 +1012,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async createCustomPasscodeCommand(type, passCode, startDate, endDate, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1029,7 +1042,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async recoverCustomPasscodeCommand(type, passCode, startDate, endDate, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1059,7 +1072,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async updateCustomPasscodeCommand(type, oldPassCode, newPassCode, startDate, endDate, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1089,7 +1102,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async deleteCustomPasscodeCommand(type, passCode, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1119,7 +1132,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async clearCustomPasscodesCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1147,7 +1160,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async getCustomPasscodesCommand(sequence = 0, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1166,8 +1179,8 @@ class TTLockApi extends events_1.EventEmitter {
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
                 const rawData = cmd.commandData;
                 const code = rawData && rawData.length >= 1 ? rawData[0] : null;
-                // FAILED + code=0x01 : sentinel firmware "fin de liste" (aucun code à cette séquence)
-                // On retourne sequence=-1 pour signaler la fin de l'itération sans lever d'erreur.
+                // FAILED + code=0x01: firmware "end of list" sentinel (no code at this sequence)
+                // Return sequence=-1 to signal the end of iteration without throwing an error.
                 if (code === 0x01) {
                     return { sequence: -1, data: [] };
                 }
@@ -1183,7 +1196,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async getICCommand(sequence = 0, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1202,8 +1215,8 @@ class TTLockApi extends events_1.EventEmitter {
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
                 const rawData = cmd.commandData;
                 const code = rawData && rawData.length >= 1 ? rawData[0] : null;
-                // FAILED + code=0x01 : sentinel firmware "fin de liste" (aucun code à cette séquence)
-                // On retourne sequence=-1 pour signaler la fin de l'itération sans lever d'erreur.
+                // FAILED + code=0x01: firmware "end of list" sentinel (no code at this sequence)
+                // Return sequence=-1 to signal the end of iteration without throwing an error.
                 if (code === 0x01) {
                     return { sequence: -1, data: [] };
                 }
@@ -1220,7 +1233,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async addICCommand(cardNumber, startDate, endDate, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1231,7 +1244,7 @@ class TTLockApi extends events_1.EventEmitter {
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_IC_MANAGE);
         let cmd = requestEnvelope.getCommand();
-        if (typeof cardNumber != 'undefined' && typeof startDate != 'undefined' && typeof endDate != 'undefined') {
+        if (cardNumber !== undefined && startDate !== undefined && endDate !== undefined) {
             cmd.setAdd(cardNumber, startDate, endDate);
         }
         else {
@@ -1244,7 +1257,7 @@ class TTLockApi extends events_1.EventEmitter {
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS || (cmd.getType() != ICOperate_1.ICOperate.STATUS_ENTER_ADD_MODE && cmd.getType() != ICOperate_1.ICOperate.STATUS_ADD_SUCCESS)) {
                 throw new Error('Failed add IC response');
             }
-            if (typeof cardNumber != 'undefined' && typeof startDate != 'undefined' && typeof endDate != 'undefined') {
+            if (cardNumber !== undefined && startDate !== undefined && endDate !== undefined) {
                 return cmd.getCardNumber();
             }
             this.emit('scanICStart', this);
@@ -1267,7 +1280,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async updateICCommand(cardNumber, startDate, endDate, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1294,7 +1307,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async deleteICCommand(cardNumber, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1321,7 +1334,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async clearICCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1348,7 +1361,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async getFRCommand(sequence = 0, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1367,8 +1380,8 @@ class TTLockApi extends events_1.EventEmitter {
             if (cmd.getResponse() != CommandResponse_1.CommandResponse.SUCCESS) {
                 const rawData = cmd.commandData;
                 const code = rawData && rawData.length >= 1 ? rawData[0] : null;
-                // FAILED + code=0x01 : sentinel firmware "fin de liste" (aucun code à cette séquence)
-                // On retourne sequence=-1 pour signaler la fin de l'itération sans lever d'erreur.
+                // FAILED + code=0x01: firmware "end of list" sentinel (no code at this sequence)
+                // Return sequence=-1 to signal the end of iteration without throwing an error.
                 if (code === 0x01) {
                     return { sequence: -1, data: [] };
                 }
@@ -1385,7 +1398,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async addFRCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1433,7 +1446,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async updateFRCommand(fpNumber, startDate, endDate, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1460,7 +1473,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async deleteFRCommand(fpNumber, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1487,7 +1500,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async clearFRCommand(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1514,7 +1527,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async getOperationLogCommand(sequence = 0xffff, aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }
@@ -1549,7 +1562,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     async macro_readAllDeviceInfo(aesKey) {
-        if (typeof aesKey == 'undefined') {
+        if (aesKey === undefined) {
             if (this.privateData.aesKey) {
                 aesKey = this.privateData.aesKey;
             }

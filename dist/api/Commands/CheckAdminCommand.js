@@ -13,7 +13,7 @@ class CheckAdminCommand extends Command_1.Command {
         // nothing to do, all incomming data is the 'token'
     }
     build() {
-        if (typeof this.adminPs != "undefined") {
+        if (this.adminPs !== undefined) {
             const data = Buffer.alloc(11);
             // lockFlagPos (4 bytes at offset 3) is written first, then adminPs (4 bytes
             // at offset 0) overwrites byte 3 with its last byte. Correct only because

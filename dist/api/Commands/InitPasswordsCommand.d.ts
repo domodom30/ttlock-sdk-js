@@ -6,7 +6,7 @@ export interface CodeSecret {
     secret: string;
 }
 export declare class InitPasswordsCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     protected pwdInfo?: CodeSecret[];
     protected processData(): void;
     build(): Buffer;

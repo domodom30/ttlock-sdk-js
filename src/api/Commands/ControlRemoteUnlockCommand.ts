@@ -5,7 +5,7 @@ import { ConfigRemoteUnlock } from "../../constant/ConfigRemoteUnlock";
 import { Command } from "../Command";
 
 export class ControlRemoteUnlockCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_CONTROL_REMOTE_UNLOCK;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_CONTROL_REMOTE_UNLOCK;
 
   private opType: ConfigRemoteUnlock.OP_TYPE_SEARCH | ConfigRemoteUnlock.OP_TYPE_MODIFY = ConfigRemoteUnlock.OP_TYPE_SEARCH;
   private opValue?: ConfigRemoteUnlock.OP_CLOSE | ConfigRemoteUnlock.OP_OPEN;
@@ -24,7 +24,7 @@ export class ControlRemoteUnlockCommand extends Command {
   build(): Buffer {
     if (this.opType == ConfigRemoteUnlock.OP_TYPE_SEARCH) {
       return Buffer.from([this.opType]);
-    } else if (this.opType == ConfigRemoteUnlock.OP_TYPE_MODIFY && typeof this.opValue != "undefined") {
+    } else if (this.opType == ConfigRemoteUnlock.OP_TYPE_MODIFY && this.opValue !== undefined) {
       return Buffer.from([this.opType, this.opValue]);
     } else {
       return Buffer.from([]);
@@ -37,13 +37,13 @@ export class ControlRemoteUnlockCommand extends Command {
   }
 
   getValue(): ConfigRemoteUnlock.OP_CLOSE | ConfigRemoteUnlock.OP_OPEN | void {
-    if (typeof this.opValue != "undefined") {
+    if (this.opValue !== undefined) {
       return this.opValue;
     }
   }
 
   getBatteryCapacity(): number {
-    if (typeof this.batteryCapacity != "undefined") {
+    if (this.batteryCapacity !== undefined) {
       return this.batteryCapacity;
     } else {
       return -1;

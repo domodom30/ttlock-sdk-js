@@ -11,7 +11,7 @@ export interface CodeSecret {
 }
 
 export class InitPasswordsCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_INIT_PASSWORDS;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_INIT_PASSWORDS;
   protected pwdInfo?: CodeSecret[];
 
   protected processData(): void {

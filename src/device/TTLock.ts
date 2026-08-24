@@ -226,35 +226,35 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   hasLockSound(): boolean {
-    if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.AUDIO_MANAGEMENT)) {
+    if (this.featureList !== undefined && this.featureList.has(FeatureValue.AUDIO_MANAGEMENT)) {
       return true;
     }
     return false;
   }
 
   hasPassCode(): boolean {
-    if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.PASSCODE)) {
+    if (this.featureList !== undefined && this.featureList.has(FeatureValue.PASSCODE)) {
       return true;
     }
     return false;
   }
 
   hasICCard(): boolean {
-    if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.IC)) {
+    if (this.featureList !== undefined && this.featureList.has(FeatureValue.IC)) {
       return true;
     }
     return false;
   }
 
   hasFingerprint(): boolean {
-    if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.FINGER_PRINT)) {
+    if (this.featureList !== undefined && this.featureList.has(FeatureValue.FINGER_PRINT)) {
       return true;
     }
     return false;
   }
 
   hasAutolock(): boolean {
-    if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.AUTO_LOCK)) {
+    if (this.featureList !== undefined && this.featureList.has(FeatureValue.AUTO_LOCK)) {
       return true;
     }
     return false;
@@ -400,11 +400,11 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   /**
-   * Obtient un psFromLock valide pour une opération lock/unlock.
-   * Essaie d'abord la voie "user" (checkUserTime). Si la serrure la rejette
-   * (pas d'utilisateur enregistré, serrure type room-lock, etc.), bascule
-   * automatiquement sur la voie "admin" (checkAdmin seul — le challenge est
-   * ensuite consommé directement par unlockCommand/lockCommand via setSum).
+   * Obtains a valid psFromLock for a lock/unlock operation.
+   * First tries the "user" path (checkUserTime). If the lock rejects it
+   * (no registered user, room-lock type lock, etc.), automatically falls
+   * back to the "admin" path (checkAdmin only — the challenge is then
+   * consumed directly by unlockCommand/lockCommand via setSum).
    */
   private async getPsFromLock(): Promise<number> {
     try {
@@ -414,10 +414,10 @@ export class TTLock extends TTLockApi implements TTLock {
       return ps;
     } catch (userErr) {
       log('========= check user time failed, falling back to admin path:', userErr);
-      // Voie admin : checkAdmin uniquement — le psFromLock est ensuite passé
-      // à unlockCommand/lockCommand qui envoie setSum(ps, unlockKey).
-      // Ne PAS appeler checkRandom ici : il consommerait le challenge et la
-      // commande unlock suivante serait rejetée par la serrure.
+      // Admin path: checkAdmin only — the psFromLock is then passed to
+      // unlockCommand/lockCommand which sends setSum(ps, unlockKey).
+      // Do NOT call checkRandom here: it would consume the challenge and the
+      // next unlock command would be rejected by the lock.
       log('========= check admin (admin path)');
       const ps = await this.checkAdminCommand();
       log('========= check admin OK:', ps);
@@ -509,7 +509,7 @@ export class TTLock extends TTLockApi implements TTLock {
 
     const oldStatus = this.lockedStatus;
 
-    if (noCache || this.lockedStatus == LockedStatus.UNKNOWN) {
+    if (noCache || this.lockedStatus == LockedStatus.UNKNOWN || this.statusUnverified) {
       if (!this.isConnected()) {
         throw new Error('Lock is not connected');
       }
@@ -517,6 +517,7 @@ export class TTLock extends TTLockApi implements TTLock {
       try {
         log('========= check lock status');
         this.lockedStatus = await this.searchBycicleStatusCommand();
+        this.statusUnverified = false;
         log('========= check lock status', this.lockedStatus);
       } catch (error) {
         log.error('Error getting lock status', error);
@@ -542,7 +543,7 @@ export class TTLock extends TTLockApi implements TTLock {
     const oldAutoLockTime = this.autoLockTime;
 
     if (noCache || this.autoLockTime == -1) {
-      if (typeof this.featureList != 'undefined') {
+      if (this.featureList !== undefined) {
         if (this.featureList.has(FeatureValue.AUTO_LOCK)) {
           if (!this.isConnected()) {
             throw new Error('Lock is not connected');
@@ -569,8 +570,8 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   /**
-   * Synchronise l'horloge de la serrure sur l'heure système actuelle.
-   * Équivalent de setLockTime() dans le SDK officiel TTLock.
+   * Synchronizes the lock's clock with the current system time.
+   * Equivalent to setLockTime() in the official TTLock SDK.
    */
   async setLockTime(): Promise<boolean> {
     if (!this.isConnected()) {
@@ -589,9 +590,9 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   /**
-   * Lit l'heure courante de la serrure.
-   * Équivalent de getLockTime() dans le SDK officiel TTLock.
-   * @returns Date — l'heure interne de la serrure
+   * Reads the lock's current time.
+   * Equivalent to getLockTime() in the official TTLock SDK.
+   * @returns Date — the lock's internal time
    */
   async getLockTime(): Promise<Date> {
     if (!this.isConnected()) {
@@ -613,7 +614,7 @@ export class TTLock extends TTLockApi implements TTLock {
     }
 
     if (this.autoLockTime != autoLockTime) {
-      if (typeof this.featureList != 'undefined') {
+      if (this.featureList !== undefined) {
         if (this.featureList.has(FeatureValue.AUTO_LOCK)) {
           try {
             if (await this.macro_adminLogin()) {
@@ -642,7 +643,7 @@ export class TTLock extends TTLockApi implements TTLock {
     const oldSound = this.lockSound;
 
     if (noCache || this.lockSound == AudioManage.UNKNOWN) {
-      if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.AUDIO_MANAGEMENT)) {
+      if (this.featureList !== undefined && this.featureList.has(FeatureValue.AUDIO_MANAGEMENT)) {
         if (!this.isConnected()) {
           throw new Error('Lock is not connected');
         }
@@ -689,7 +690,7 @@ export class TTLock extends TTLockApi implements TTLock {
     const audioValue: AudioManage.TURN_ON | AudioManage.TURN_OFF = lockSound === LockSoundVolume.OFF ? AudioManage.TURN_OFF : AudioManage.TURN_ON;
 
     if (this.lockSound !== audioValue) {
-      if (typeof this.featureList != 'undefined' && this.featureList.has(FeatureValue.AUDIO_MANAGEMENT)) {
+      if (this.featureList !== undefined && this.featureList.has(FeatureValue.AUDIO_MANAGEMENT)) {
         try {
           if (await this.macro_adminLogin()) {
             log('========= lockSound');
@@ -739,15 +740,15 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   /**
-   * Re-synchronise le passcode admin du clavier physique de la serrure avec
-   * une valeur connue côté SDK. Ne touche pas au pairing BLE ni à `lockData.json`.
+   * Re-synchronizes the physical keypad admin passcode of the lock with a
+   * value known to the SDK. Does not affect the BLE pairing nor `lockData.json`.
    *
-   * Utile lorsque l'admin clavier a été modifié via la serrure (events
-   * recordType 92/93) et que le firmware bloque certaines opérations BLE
-   * (typiquement ajout de passcodes utilisateur → 0x14).
+   * Useful when the keypad admin has been changed via the lock (events
+   * recordType 92/93) and the firmware blocks certain BLE operations
+   * (typically adding user passcodes → 0x14).
    *
-   * @param passcode 4-9 chiffres. Si omis, un code aléatoire à 7 chiffres est généré.
-   * @returns Le passcode admin clavier effectivement défini, ou false en cas d'échec.
+   * @param passcode 4-9 digits. If omitted, a random 7-digit code is generated.
+   * @returns The keypad admin passcode actually set, or false on failure.
    */
   async syncAdminKeyboardPasscode(passcode?: string): Promise<string | false> {
     if (!this.isConnected()) {
@@ -774,13 +775,13 @@ export class TTLock extends TTLockApi implements TTLock {
   }
 
   /**
-   * Programme un "erase passcode" : un code à 4-9 chiffres qui, tapé sur le clavier physique,
-   * déclenche un reset usine de la serrure. Utile en dernier recours quand le module clavier est
-   * verrouillé par le firmware (code 0x14) et que les commandes admin-write classiques sont
-   * rejetées — cette commande utilise COMM_SET_DELETE_PWD (0x44), un canal distinct.
+   * Programs an "erase passcode": a 4-9 digit code that, typed on the physical keypad,
+   * triggers a factory reset of the lock. Useful as a last resort when the keypad module is
+   * locked by the firmware (code 0x14) and the classic admin-write commands are
+   * rejected — this command uses COMM_SET_DELETE_PWD (0x44), a separate channel.
    *
-   * @param erasePasscode 4-9 chiffres
-   * @returns Le passcode défini, ou false en cas d'échec.
+   * @param erasePasscode 4-9 digits
+   * @returns The passcode that was set, or false on failure.
    */
   async setErasePasscode(erasePasscode: string): Promise<string | false> {
     if (!this.isConnected()) {
@@ -1172,7 +1173,7 @@ export class TTLock extends TTLockApi implements TTLock {
     try {
       if (await this.macro_adminLogin()) {
         log('========= add IC Card');
-        if (typeof cardNumber != 'undefined') {
+        if (cardNumber !== undefined) {
           const addedCardNumber = await this.addICCommand(cardNumber, startDate, endDate);
           log('========= add IC Card', addedCardNumber);
         } else {
@@ -1516,7 +1517,7 @@ export class TTLock extends TTLockApi implements TTLock {
       throw new Error('Lock is in pairing mode');
     }
 
-    if (typeof this.featureList == 'undefined') {
+    if (this.featureList === undefined) {
       throw new Error('Lock features missing');
     }
 
@@ -1531,7 +1532,7 @@ export class TTLock extends TTLockApi implements TTLock {
     try {
       if (await this.macro_adminLogin()) {
         log('========= remoteUnlock');
-        if (typeof type != 'undefined') {
+        if (type !== undefined) {
           this.remoteUnlock = await this.controlRemoteUnlockCommand(type);
         } else {
           this.remoteUnlock = await this.controlRemoteUnlockCommand();
@@ -1623,7 +1624,7 @@ export class TTLock extends TTLockApi implements TTLock {
           for (let entry of response.data) {
             if (entry) {
               const cached = this.operationLog[entry.recordNumber];
-              if (typeof cached == 'undefined' || cached == null) {
+              if (cached === undefined || cached == null) {
                 pageHadNew = true;
               }
               newOperations.push(entry);
@@ -1732,7 +1733,7 @@ export class TTLock extends TTLockApi implements TTLock {
         let missing = [];
         for (let i = 0; i < maxRecordNumber; i++) {
           if (this.missingSequences.has(i)) continue;
-          if (typeof operations[i] == 'undefined' || operations[i] == null) {
+          if (operations[i] === undefined || operations[i] == null) {
             missing.push(i);
           }
         }
@@ -1885,7 +1886,7 @@ export class TTLock extends TTLockApi implements TTLock {
       // read general data
       log('Connected to known lock, reading general data');
       try {
-        if (typeof this.featureList == 'undefined') {
+        if (this.featureList === undefined) {
           // Search device features
           log('========= feature list');
           this.featureList = await this.searchDeviceFeatureCommand();
@@ -1899,11 +1900,19 @@ export class TTLock extends TTLockApi implements TTLock {
           log('========= autoLockTime:', this.autoLockTime);
         }
 
-        if (this.lockedStatus == LockedStatus.UNKNOWN) {
+        if (this.lockedStatus == LockedStatus.UNKNOWN || this.statusUnverified) {
           // Locked/unlocked status
           log('========= check lock status');
+          const oldStatus = this.lockedStatus;
           this.lockedStatus = await this.searchBycicleStatusCommand();
+          this.statusUnverified = false;
           log('========= check lock status', this.lockedStatus);
+          // Propagate a corrected status to event-based consumers: the advertising
+          // path no longer asserts LOCKED, so a genuine re-lock is only discovered
+          // by this active query and would otherwise never be signalled.
+          if (oldStatus != this.lockedStatus) {
+            this.emit(this.lockedStatus == LockedStatus.LOCKED ? 'locked' : 'unlocked', this);
+          }
         }
 
         if (this.featureList.has(FeatureValue.AUDIO_MANAGEMENT) && this.lockSound == AudioManage.UNKNOWN) {

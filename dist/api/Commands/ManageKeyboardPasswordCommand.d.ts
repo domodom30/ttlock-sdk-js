@@ -3,7 +3,7 @@ import { KeyboardPwdType } from "../../constant/KeyboardPwdType";
 import { PwdOperateType } from "../../constant/PwdOperateType";
 import { Command } from "../Command";
 export declare class ManageKeyboardPasswordCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType;
     private type?;
     private oldPassCode?;

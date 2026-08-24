@@ -48,7 +48,7 @@ class LockCommand extends Command_1.Command {
         return data;
     }
     getBatteryCapacity() {
-        if (typeof this.batteryCapacity != "undefined") {
+        if (this.batteryCapacity !== undefined) {
             return this.batteryCapacity;
         }
         else {

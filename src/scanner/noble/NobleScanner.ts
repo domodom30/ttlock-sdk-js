@@ -39,7 +39,7 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   }
 
   protected initNoble() {
-    if (typeof this.noble != "undefined") {
+    if (this.noble !== undefined) {
       this.noble.on("discover", this.onDiscoverBound);
       this.noble.on("stateChange", this.onStateChangeBound);
       this.noble.on("scanStart", this.onScanStartBound);
@@ -48,7 +48,7 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   }
 
   destroy(): void {
-    if (typeof this.noble != "undefined") {
+    if (this.noble !== undefined) {
       this.noble.removeListener("discover", this.onDiscoverBound);
       this.noble.removeListener("stateChange", this.onStateChangeBound);
       this.noble.removeListener("scanStart", this.onScanStartBound);
@@ -86,7 +86,7 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
     allowDuplicates: boolean = true,
   ): Promise<boolean> {
     try {
-      if (typeof this.noble != "undefined") {
+      if (this.noble !== undefined) {
         await this.noble.startScanningAsync(this.uuids, allowDuplicates);
         this.scannerState = "scanning";
         return true;
@@ -102,7 +102,7 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
 
   private async stopNobleScan(): Promise<boolean> {
     try {
-      if (typeof this.noble != "undefined") {
+      if (this.noble !== undefined) {
         await this.noble.stopScanningAsync();
         this.scannerState = "stopped";
         return true;
@@ -143,7 +143,7 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
       }
     } else {
       let nobleDevice = this.devices.get(peripheral.id);
-      if (typeof nobleDevice != "undefined") {
+      if (nobleDevice !== undefined) {
         nobleDevice.updateFromPeripheral();
         if (this.checkPeripheralAdvertisement(peripheral)) {
           this.emit("discover", nobleDevice);
@@ -155,13 +155,13 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   protected checkPeripheralAdvertisement(
     peripheral: nobleObj.Peripheral,
   ): boolean {
-    if (typeof this.uuids == "undefined" || this.uuids.length == 0) {
+    if (this.uuids === undefined || this.uuids.length == 0) {
       return true;
     }
 
     if (
-      typeof peripheral.advertisement != "undefined" &&
-      typeof peripheral.advertisement.serviceUuids != "undefined" &&
+      peripheral.advertisement !== undefined &&
+      peripheral.advertisement.serviceUuids !== undefined &&
       peripheral.advertisement.serviceUuids.length > 0
     ) {
       for (let service of peripheral.advertisement.serviceUuids) {

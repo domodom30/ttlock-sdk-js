@@ -11,7 +11,7 @@ export declare enum AccessoryType {
     WIRELESS_KEY_FOB = 4
 }
 export declare class AccessoryBatteryCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private accessoryType?;
     private batteryLevel?;
     protected processData(): void;

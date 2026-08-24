@@ -4,7 +4,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class SetEraseKeyboardPwdCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_SET_DELETE_PWD;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_SET_DELETE_PWD;
 
   private erasePasscode?: string;
 

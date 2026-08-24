@@ -29,7 +29,7 @@ class AutoLockManageCommand extends Command_1.Command {
         if (this.opType == AutoLockOperate_1.AutoLockOperate.SEARCH) {
             return Buffer.from([this.opType]);
         }
-        else if (typeof this.opValue != "undefined") {
+        else if (this.opValue !== undefined) {
             return Buffer.from([
                 this.opType,
                 this.opValue >> 8,
@@ -45,7 +45,7 @@ class AutoLockManageCommand extends Command_1.Command {
         this.opType = AutoLockOperate_1.AutoLockOperate.MODIFY;
     }
     getTime() {
-        if (typeof this.opValue != "undefined") {
+        if (this.opValue !== undefined) {
             return this.opValue;
         }
         else {

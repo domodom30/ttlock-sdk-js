@@ -1,6 +1,6 @@
 'use strict';
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { createLogger } from './logger';
 
 const log = createLogger('ttlock:aes');
@@ -16,7 +16,7 @@ export class AESUtil {
       return Buffer.from([]);
     }
 
-    if (typeof key == 'undefined') {
+    if (key === undefined) {
       key = defaultAESKey;
     }
 
@@ -37,7 +37,7 @@ export class AESUtil {
       return Buffer.from([]);
     }
 
-    if (typeof key == 'undefined') {
+    if (key === undefined) {
       key = defaultAESKey;
     }
 

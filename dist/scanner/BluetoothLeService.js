@@ -1,31 +1,28 @@
-"use strict";
+'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BluetoothLeService = exports.TTLockUUIDs = void 0;
-const events_1 = require("events");
+const node_events_1 = require("node:events");
 const NobleScanner_1 = require("./noble/NobleScanner");
 const TTBluetoothDevice_1 = require("../device/TTBluetoothDevice");
 const NobleScannerWebsocket_1 = require("./noble/NobleScannerWebsocket");
-exports.TTLockUUIDs = [
-    "1910",
-    "00001910-0000-1000-8000-00805f9b34fb",
-];
-class BluetoothLeService extends events_1.EventEmitter {
-    constructor(uuids = exports.TTLockUUIDs, scannerType = "noble", scannerOptions) {
+exports.TTLockUUIDs = ['1910', '00001910-0000-1000-8000-00805f9b34fb'];
+class BluetoothLeService extends node_events_1.EventEmitter {
+    constructor(uuids = exports.TTLockUUIDs, scannerType = 'noble', scannerOptions = {}) {
         super();
         this.btDevices = new Map();
-        if (scannerType == "noble") {
+        if (scannerType == 'noble') {
             this.scanner = new NobleScanner_1.NobleScanner(uuids);
         }
-        else if (scannerType == "noble-websocket") {
+        else if (scannerType == 'noble-websocket') {
             this.scanner = new NobleScannerWebsocket_1.NobleScannerWebsocket(uuids, scannerOptions.websocketHost, scannerOptions.websocketPort, scannerOptions.websocketAesKey, scannerOptions.websocketUsername, scannerOptions.websocketPassword);
         }
         else {
-            throw "Invalid parameters";
+            throw new Error('Invalid parameters');
         }
-        this.scanner.on("ready", () => this.emit("ready"));
-        this.scanner.on("discover", this.onDiscover.bind(this));
-        this.scanner.on("scanStart", () => this.emit("scanStart"));
-        this.scanner.on("scanStop", () => this.emit("scanStop"));
+        this.scanner.on('ready', () => this.emit('ready'));
+        this.scanner.on('discover', this.onDiscover.bind(this));
+        this.scanner.on('scanStart', () => this.emit('scanStart'));
+        this.scanner.on('scanStop', () => this.emit('scanStop'));
     }
     async startScan(passive = false) {
         return await this.scanner.startScan(passive);
@@ -38,7 +35,7 @@ class BluetoothLeService extends events_1.EventEmitter {
         this.removeAllListeners();
     }
     isScanning() {
-        return this.scanner.getState() == "scanning";
+        return this.scanner.getState() == 'scanning';
     }
     forgetDevice(id) {
         this.btDevices.delete(id);
@@ -47,7 +44,7 @@ class BluetoothLeService extends events_1.EventEmitter {
         // TODO: move device storage to TTLockClient
         if (this.btDevices.has(device.id)) {
             const ttDevice = this.btDevices.get(device.id);
-            if (typeof ttDevice != "undefined") {
+            if (ttDevice !== undefined) {
                 ttDevice.updateFromDevice(device);
                 // this.emit("discover", ttDevice);
             }
@@ -55,7 +52,7 @@ class BluetoothLeService extends events_1.EventEmitter {
         else {
             const ttDevice = TTBluetoothDevice_1.TTBluetoothDevice.createFromDevice(device, this.scanner);
             this.btDevices.set(device.id, ttDevice);
-            this.emit("discover", ttDevice);
+            this.emit('discover', ttDevice);
         }
     }
 }

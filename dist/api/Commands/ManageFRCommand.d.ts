@@ -7,7 +7,7 @@ export interface Fingerprint {
     endDate: string;
 }
 export declare class ManageFRCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType?;
     private sequence?;
     private fingerprints?;

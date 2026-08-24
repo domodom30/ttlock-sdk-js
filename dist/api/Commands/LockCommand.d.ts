@@ -2,7 +2,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 import { UnlockDataInterface } from "./UnlockCommand";
 export declare class LockCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private sum?;
     private uid?;
     private uniqueid?;

@@ -2,7 +2,7 @@ import { AudioManage } from "../../constant/AudioManage";
 import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 export declare class AudioManageCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType;
     private opValue?;
     private batteryCapacity?;

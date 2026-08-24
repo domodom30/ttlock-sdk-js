@@ -13,7 +13,7 @@ class CalibrationTimeCommand extends Command_1.Command {
         // nothing to do here 
     }
     build() {
-        if (typeof this.time == "undefined") {
+        if (this.time === undefined) {
             this.time = (0, moment_1.default)().format("YYMMDDHHmmss");
         }
         return (0, timeUtil_1.dateTimeToBuffer)(this.time);

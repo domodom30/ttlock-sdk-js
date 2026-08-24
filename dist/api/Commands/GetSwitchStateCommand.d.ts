@@ -5,7 +5,7 @@ import { Command } from "../Command";
  * The exact bit semantics depend on the lock model; raw + commonly-used flags are exposed.
  */
 export declare class GetSwitchStateCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private rawState?;
     protected processData(): void;
     build(): Buffer;

@@ -6,7 +6,7 @@ import { padHexString } from '../../util/digitUtil';
 import { Command } from '../Command';
 
 export class DeviceFeaturesCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_SEARCHE_DEVICE_FEATURE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_SEARCHE_DEVICE_FEATURE;
 
   private batteryCapacity?: number;
   private special?: number;

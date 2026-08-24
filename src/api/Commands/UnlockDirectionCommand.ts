@@ -20,7 +20,7 @@ export enum UnlockDirection {
  * Requires FeatureValue.UNLOCK_DIRECTION to be set in the lock's feature list.
  */
 export class UnlockDirectionCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_UNLOCK_DIRECTION;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_UNLOCK_DIRECTION;
 
   private opType: 0x01 | 0x02 = 0x01; // 0x01=query, 0x02=modify
   private direction?: UnlockDirection;
@@ -38,7 +38,7 @@ export class UnlockDirectionCommand extends Command {
   }
 
   build(): Buffer {
-    if (this.opType === 0x02 && typeof this.direction !== 'undefined') {
+    if (this.opType === 0x02 && this.direction !== undefined) {
       return Buffer.from([this.opType, this.direction]);
     }
     return Buffer.from([this.opType]);

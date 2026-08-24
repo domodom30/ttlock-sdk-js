@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.8.0]
+
+### Breaking — `AudioManage` split into two enums
+
+`AudioManage` mixed two orthogonal protocol byte-spaces in a single enum, producing a
+value collision (`QUERY = 1` and `TURN_ON = 1`), which broke the reverse mapping
+(`AudioManage[1]` resolved to `"TURN_ON"`, masking `"QUERY"`). The two domains are now
+separated:
+
+- `AudioManage` keeps only the sound-value domain: `TURN_OFF = 0`, `TURN_ON = 1`,
+  `UNKNOWN = -1`.
+- New exported enum `AudioManageOperation` holds the operation-type domain:
+  `QUERY = 1`, `MODIFY = 2`.
+
+The raw protocol values are unchanged, so BLE behaviour is identical. `getLockSound()`
+still returns `AudioManage` with the same members. **Migration:** any code referencing
+`AudioManage.QUERY` / `AudioManage.MODIFY` must switch to `AudioManageOperation.QUERY` /
+`AudioManageOperation.MODIFY`.
+
+### Breaking — operation log names translated to English
+
+`LogOperateNames` values were in French; they are now English (e.g. `'Passcode unlock'`,
+`'Low battery alarm'`). Consumers displaying these labels will see English output.
+`LogOperateCategory` was also documented. Enum keys are unchanged.
+
+### Fixed — `NobleDevice.connect()` could tear down a connection that was about to succeed
+
+`connect()` waited for the native connect result with a polling loop. If the native
+callback reported success just after the loop's timeout elapsed, the method still
+returned `false` **and** called `cancelConnect()`, killing a link that had actually
+connected — the root of the "connected then immediately failed" reconnection churn seen
+against flaky BLE links. It is now promise-based and settles exactly on the native
+callback: a connection that completes within the timeout is never cancelled, and a
+connect **error** now resolves immediately instead of blocking for the full timeout.
+
+### Housekeeping — lint/quality pass, no behaviour change
+
+- `static readonly COMMAND_TYPE` on all `Command` subclasses; `readonly` on
+  `BluetoothLeService` fields.
+- `typeof x === 'undefined'` comparisons replaced with direct `x === undefined`
+  throughout.
+- `throw new Error(...)` instead of throwing a string literal; `String.raw` for the
+  regex-escape replacement; `Number.parseInt(..., 10)` with explicit radix;
+  default value for the `scannerOptions` constructor parameter.
+- French comments/JSDoc translated to English across the codebase.
+
 ## [0.7.4]
 
 ### Fixed — `getOperationLog(all)` backfill could outlive the BLE session

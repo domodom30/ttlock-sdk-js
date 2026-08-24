@@ -18,7 +18,7 @@ function parseFilters(): RegExp[] {
     .filter((s) => s.length > 0)
     .map((pattern) => {
       const escaped = pattern
-        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`)
         .replace(/\*/g, ".*");
       return new RegExp("^" + escaped + "$");
     });

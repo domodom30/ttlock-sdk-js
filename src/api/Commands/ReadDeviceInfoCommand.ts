@@ -5,7 +5,7 @@ import { DeviceInfoEnum } from "../../constant/DeviceInfoEnum";
 import { Command } from "../Command";
 
 export class ReadDeviceInfoCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_READ_DEVICE_INFO;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_READ_DEVICE_INFO;
   private opType: DeviceInfoEnum = DeviceInfoEnum.MODEL_NUMBER;
 
   protected processData(): void {

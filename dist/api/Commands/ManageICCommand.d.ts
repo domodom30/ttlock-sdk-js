@@ -7,7 +7,7 @@ export interface ICCard {
     endDate: string;
 }
 export declare class ManageICCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType?;
     private sequence?;
     private cards?;

@@ -12,7 +12,7 @@ export interface UnlockDataInterface {
 }
 
 export class UnlockCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_UNLOCK;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_UNLOCK;
 
   private sum?: number;
   private uid?: number;
@@ -64,7 +64,7 @@ export class UnlockCommand extends Command {
   }
 
   getBatteryCapacity(): number {
-    if (typeof this.batteryCapacity != "undefined") {
+    if (this.batteryCapacity !== undefined) {
       return this.batteryCapacity;
     } else {
       return -1;

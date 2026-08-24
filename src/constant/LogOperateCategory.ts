@@ -3,7 +3,7 @@
 import { LogOperate } from './LogOperate';
 
 export const LogOperateCategory = {
-  /** Tous les déverrouillages réussis */
+  /** All successful unlocks */
   UNLOCK: [
     LogOperate.OPERATE_TYPE_MOBILE_UNLOCK,
     LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK,
@@ -20,10 +20,10 @@ export const LogOperateCategory = {
     LogOperate.WIRELESS_KEY_FOB
   ],
 
-  /** Tous les verrouillages */
+  /** All locks */
   LOCK: [LogOperate.OPERATE_BLE_LOCK, LogOperate.DOOR_SENSOR_LOCK, LogOperate.FR_LOCK, LogOperate.PASSCODE_LOCK, LogOperate.IC_LOCK, LogOperate.OPERATE_KEY_LOCK],
 
-  /** Tentatives échouées */
+  /** Failed attempts */
   FAILED: [
     LogOperate.OPERATE_TYPE_ERROR_PASSWORD_UNLOCK,
     LogOperate.OPERATE_TYPE_PASSCODE_EXPIRED,
@@ -37,7 +37,7 @@ export const LogOperateCategory = {
     LogOperate.APP_UNLOCK_FAILED_LOCK_REVERSE
   ],
 
-  /** Gestion codes / mots de passe */
+  /** Passcode / password management */
   PASSCODE: [
     LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD,
     LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD,
@@ -47,18 +47,18 @@ export const LogOperateCategory = {
     LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD
   ],
 
-  /** Gestion cartes IC */
+  /** IC card management */
   IC: [LogOperate.OPERATE_TYPE_ADD_IC, LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED, LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED, LogOperate.OPERATE_TYPE_CLEAR_IC_SUCCEED, LogOperate.OPERATE_TYPE_IC_UNLOCK_FAILED, LogOperate.IC_LOCK],
 
-  /** Gestion empreintes digitales */
+  /** Fingerprint management */
   FINGERPRINT: [LogOperate.OPERATE_TYPE_ADD_FR, LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED, LogOperate.OPERATE_TYPE_FR_UNLOCK_FAILED, LogOperate.OPERATE_TYPE_DELETE_FR_SUCCEED, LogOperate.OPERATE_TYPE_CLEAR_FR_SUCCEED, LogOperate.FR_LOCK],
 
-  /** Alarmes et alertes */
+  /** Alarms and alerts */
   ALARM: [LogOperate.TAMPER_ALARM, LogOperate.LOW_BATTERY_ALARM, LogOperate.DOOR_NOT_LOCKED_ALARM, LogOperate.DOOR_OPENED_ALARM, LogOperate.DOOR_SENSOR_ANOMALY, LogOperate.KEYBOARD_LOCKED],
 
-  /** Événements système */
+  /** System events */
   SYSTEM: [LogOperate.OPERATE_TYPE_DOOR_REBOOT, LogOperate.RESET_BUTTON],
 
-  /** Périphériques sans fil */
+  /** Wireless peripherals */
   WIRELESS: [LogOperate.REMOTE_CONTROL_KEY, LogOperate.WIRELESS_KEY_FOB, LogOperate.WIRELESS_KEY_PAD]
 };

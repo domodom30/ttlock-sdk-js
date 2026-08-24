@@ -5,7 +5,7 @@ import { LampManage } from "../../constant/LampManage";
 import { Command } from "../Command";
 
 export class ControlLampCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_LAMP;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_LAMP;
 
   private opType: LampManage.QUERY | LampManage.MODIFY = LampManage.QUERY;
   private opValue?: LampManage.TURN_ON | LampManage.TURN_OFF;
@@ -21,7 +21,7 @@ export class ControlLampCommand extends Command {
     if (this.opType == LampManage.QUERY) {
       return Buffer.from([this.opType]);
     }
-    if (this.opType == LampManage.MODIFY && typeof this.opValue !== "undefined") {
+    if (this.opType == LampManage.MODIFY && this.opValue !== undefined) {
       return Buffer.from([this.opType, this.opValue]);
     }
     return Buffer.from([]);

@@ -4,70 +4,70 @@ import { LogOperate } from './LogOperate';
 
 export const LogOperateNames: string[] = [];
 
-// --- Déverrouillages ---
-LogOperateNames[LogOperate.OPERATE_TYPE_MOBILE_UNLOCK] = 'Déverrouillage Bluetooth / réseau';
-LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK] = 'Déverrouillage code';
-LogOperateNames[LogOperate.OPERATE_TYPE_USE_DELETE_CODE] = 'Déverrouillage code à usage unique (efface les anciens)';
-LogOperateNames[LogOperate.OPERATE_TYPE_BONG_UNLOCK_SUCCEED] = 'Déverrouillage bracelet Bong';
-LogOperateNames[LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED] = 'Déverrouillage empreinte';
-LogOperateNames[LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED] = 'Déverrouillage carte IC';
-LogOperateNames[LogOperate.OPERATE_KEY_UNLOCK] = 'Déverrouillage clé mécanique';
-LogOperateNames[LogOperate.GATEWAY_UNLOCK] = 'Déverrouillage passerelle';
-LogOperateNames[LogOperate.ILLAGEL_UNLOCK] = 'Déverrouillage illégal (effraction)';
-LogOperateNames[LogOperate.DOOR_SENSOR_UNLOCK] = 'Ouverture capteur de porte';
-LogOperateNames[LogOperate.DOOR_GO_OUT] = 'Passage sortie enregistré';
-LogOperateNames[LogOperate.REMOTE_CONTROL_KEY] = 'Déverrouillage télécommande';
-LogOperateNames[LogOperate.WIRELESS_KEY_FOB] = 'Déverrouillage télécommande sans fil';
+// --- Unlocks ---
+LogOperateNames[LogOperate.OPERATE_TYPE_MOBILE_UNLOCK] = 'Bluetooth / network unlock';
+LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_UNLOCK] = 'Passcode unlock';
+LogOperateNames[LogOperate.OPERATE_TYPE_USE_DELETE_CODE] = 'One-time code unlock (erases previous codes)';
+LogOperateNames[LogOperate.OPERATE_TYPE_BONG_UNLOCK_SUCCEED] = 'Bong wristband unlock';
+LogOperateNames[LogOperate.OPERATE_TYPE_FR_UNLOCK_SUCCEED] = 'Fingerprint unlock';
+LogOperateNames[LogOperate.OPERATE_TYPE_IC_UNLOCK_SUCCEED] = 'IC card unlock';
+LogOperateNames[LogOperate.OPERATE_KEY_UNLOCK] = 'Mechanical key unlock';
+LogOperateNames[LogOperate.GATEWAY_UNLOCK] = 'Gateway unlock';
+LogOperateNames[LogOperate.ILLAGEL_UNLOCK] = 'Illegal unlock (break-in)';
+LogOperateNames[LogOperate.DOOR_SENSOR_UNLOCK] = 'Door sensor opened';
+LogOperateNames[LogOperate.DOOR_GO_OUT] = 'Exit passage recorded';
+LogOperateNames[LogOperate.REMOTE_CONTROL_KEY] = 'Remote control unlock';
+LogOperateNames[LogOperate.WIRELESS_KEY_FOB] = 'Wireless key fob unlock';
 
-// --- Verrouillages ---
-LogOperateNames[LogOperate.OPERATE_BLE_LOCK] = 'Verrouillage Bluetooth / réseau';
-LogOperateNames[LogOperate.DOOR_SENSOR_LOCK] = 'Verrouillage capteur de porte';
-LogOperateNames[LogOperate.FR_LOCK] = 'Verrouillage empreinte';
-LogOperateNames[LogOperate.PASSCODE_LOCK] = 'Verrouillage code';
-LogOperateNames[LogOperate.IC_LOCK] = 'Verrouillage carte IC';
-LogOperateNames[LogOperate.OPERATE_KEY_LOCK] = 'Verrouillage clé mécanique';
+// --- Locks ---
+LogOperateNames[LogOperate.OPERATE_BLE_LOCK] = 'Bluetooth / network lock';
+LogOperateNames[LogOperate.DOOR_SENSOR_LOCK] = 'Door sensor lock';
+LogOperateNames[LogOperate.FR_LOCK] = 'Fingerprint lock';
+LogOperateNames[LogOperate.PASSCODE_LOCK] = 'Passcode lock';
+LogOperateNames[LogOperate.IC_LOCK] = 'IC card lock';
+LogOperateNames[LogOperate.OPERATE_KEY_LOCK] = 'Mechanical key lock';
 
-// --- Échecs ---
-LogOperateNames[LogOperate.OPERATE_TYPE_ERROR_PASSWORD_UNLOCK] = 'Code incorrect';
-LogOperateNames[LogOperate.OPERATE_TYPE_PASSCODE_EXPIRED] = 'Code expiré';
-LogOperateNames[LogOperate.OPERATE_TYPE_SPACE_INSUFFICIENT] = 'Déverrouillage échoué – stockage insuffisant';
-LogOperateNames[LogOperate.OPERATE_TYPE_PASSCODE_IN_BLACK_LIST] = 'Déverrouillage échoué – code en liste noire';
-LogOperateNames[LogOperate.OPERATE_TYPE_FR_UNLOCK_FAILED] = 'Échec déverrouillage empreinte';
-LogOperateNames[LogOperate.OPERATE_TYPE_IC_UNLOCK_FAILED] = 'Échec déverrouillage carte IC (expirée ou invalide)';
-LogOperateNames[LogOperate.PASSCODE_UNLOCK_FAILED_LOCK_REVERSE] = 'Échec déverrouillage code – porte bloquée';
-LogOperateNames[LogOperate.IC_UNLOCK_FAILED_LOCK_REVERSE] = 'Échec déverrouillage carte IC – porte bloquée';
-LogOperateNames[LogOperate.FR_UNLOCK_FAILED_LOCK_REVERSE] = 'Échec déverrouillage empreinte – porte bloquée';
-LogOperateNames[LogOperate.APP_UNLOCK_FAILED_LOCK_REVERSE] = 'Échec déverrouillage app – porte bloquée';
+// --- Failures ---
+LogOperateNames[LogOperate.OPERATE_TYPE_ERROR_PASSWORD_UNLOCK] = 'Wrong passcode';
+LogOperateNames[LogOperate.OPERATE_TYPE_PASSCODE_EXPIRED] = 'Expired passcode';
+LogOperateNames[LogOperate.OPERATE_TYPE_SPACE_INSUFFICIENT] = 'Unlock failed - insufficient storage';
+LogOperateNames[LogOperate.OPERATE_TYPE_PASSCODE_IN_BLACK_LIST] = 'Unlock failed - code blacklisted';
+LogOperateNames[LogOperate.OPERATE_TYPE_FR_UNLOCK_FAILED] = 'Fingerprint unlock failed';
+LogOperateNames[LogOperate.OPERATE_TYPE_IC_UNLOCK_FAILED] = 'IC card unlock failed (expired or invalid)';
+LogOperateNames[LogOperate.PASSCODE_UNLOCK_FAILED_LOCK_REVERSE] = 'Passcode unlock failed - door jammed';
+LogOperateNames[LogOperate.IC_UNLOCK_FAILED_LOCK_REVERSE] = 'IC card unlock failed - door jammed';
+LogOperateNames[LogOperate.FR_UNLOCK_FAILED_LOCK_REVERSE] = 'Fingerprint unlock failed - door jammed';
+LogOperateNames[LogOperate.APP_UNLOCK_FAILED_LOCK_REVERSE] = 'App unlock failed - door jammed';
 
-// --- Gestion codes ---
-LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD] = 'Modification de code';
-LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD] = "Suppression d'un code";
-LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS] = 'Suppression de tous les codes';
-LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED] = 'Code remplacé (capacité maximale atteinte)';
-LogOperateNames[LogOperate.ADD_ADMIN_BY_KEYBOARD] = 'Code administrateur défini via clavier (initialisation)';
-LogOperateNames[LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD] = 'Code administrateur modifié via clavier';
+// --- Passcode management ---
+LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_MODIFY_PASSWORD] = 'Passcode modified';
+LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_SINGLE_PASSWORD] = 'Passcode removed';
+LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_REMOVE_ALL_PASSWORDS] = 'All passcodes removed';
+LogOperateNames[LogOperate.OPERATE_TYPE_KEYBOARD_PASSWORD_KICKED] = 'Passcode replaced (maximum capacity reached)';
+LogOperateNames[LogOperate.ADD_ADMIN_BY_KEYBOARD] = 'Admin passcode set via keypad (initialization)';
+LogOperateNames[LogOperate.MODIFY_ADMIN_KEYBOARD_PASSWORD] = 'Admin passcode modified via keypad';
 
-// --- Gestion cartes IC ---
-LogOperateNames[LogOperate.OPERATE_TYPE_ADD_IC] = 'Ajout carte IC';
-LogOperateNames[LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED] = "Suppression d'une carte IC";
-LogOperateNames[LogOperate.OPERATE_TYPE_CLEAR_IC_SUCCEED] = 'Suppression de toutes les cartes IC';
+// --- IC card management ---
+LogOperateNames[LogOperate.OPERATE_TYPE_ADD_IC] = 'IC card added';
+LogOperateNames[LogOperate.OPERATE_TYPE_DELETE_IC_SUCCEED] = 'IC card removed';
+LogOperateNames[LogOperate.OPERATE_TYPE_CLEAR_IC_SUCCEED] = 'All IC cards removed';
 
-// --- Gestion empreintes ---
-LogOperateNames[LogOperate.OPERATE_TYPE_ADD_FR] = 'Ajout empreinte';
-LogOperateNames[LogOperate.OPERATE_TYPE_DELETE_FR_SUCCEED] = "Suppression d'une empreinte";
-LogOperateNames[LogOperate.OPERATE_TYPE_CLEAR_FR_SUCCEED] = 'Suppression de toutes les empreintes';
+// --- Fingerprint management ---
+LogOperateNames[LogOperate.OPERATE_TYPE_ADD_FR] = 'Fingerprint added';
+LogOperateNames[LogOperate.OPERATE_TYPE_DELETE_FR_SUCCEED] = 'Fingerprint removed';
+LogOperateNames[LogOperate.OPERATE_TYPE_CLEAR_FR_SUCCEED] = 'All fingerprints removed';
 
-// --- Périphériques sans fil ---
-LogOperateNames[LogOperate.WIRELESS_KEY_PAD] = 'Clavier sans fil (batterie)';
+// --- Wireless peripherals ---
+LogOperateNames[LogOperate.WIRELESS_KEY_PAD] = 'Wireless keypad (battery)';
 
-// --- Alarmes ---
-LogOperateNames[LogOperate.TAMPER_ALARM] = 'Alarme anti-sabotage';
-LogOperateNames[LogOperate.LOW_BATTERY_ALARM] = 'Alarme batterie faible';
-LogOperateNames[LogOperate.DOOR_NOT_LOCKED_ALARM] = 'Alarme porte non verrouillée';
-LogOperateNames[LogOperate.DOOR_OPENED_ALARM] = 'Alarme porte ouverte';
-LogOperateNames[LogOperate.DOOR_SENSOR_ANOMALY] = 'Anomalie capteur de porte';
-LogOperateNames[LogOperate.KEYBOARD_LOCKED] = 'Clavier bloqué (trop de tentatives erronées)';
+// --- Alarms ---
+LogOperateNames[LogOperate.TAMPER_ALARM] = 'Tamper alarm';
+LogOperateNames[LogOperate.LOW_BATTERY_ALARM] = 'Low battery alarm';
+LogOperateNames[LogOperate.DOOR_NOT_LOCKED_ALARM] = 'Door unlocked alarm';
+LogOperateNames[LogOperate.DOOR_OPENED_ALARM] = 'Door opened alarm';
+LogOperateNames[LogOperate.DOOR_SENSOR_ANOMALY] = 'Door sensor anomaly';
+LogOperateNames[LogOperate.KEYBOARD_LOCKED] = 'Keypad locked (too many wrong attempts)';
 
-// --- Système ---
-LogOperateNames[LogOperate.OPERATE_TYPE_DOOR_REBOOT] = 'Redémarrage de la serrure (batterie reconnectée)';
-LogOperateNames[LogOperate.RESET_BUTTON] = 'Bouton de réinitialisation pressé';
+// --- System ---
+LogOperateNames[LogOperate.OPERATE_TYPE_DOOR_REBOOT] = 'Lock reboot (battery reconnected)';
+LogOperateNames[LogOperate.RESET_BUTTON] = 'Reset button pressed';

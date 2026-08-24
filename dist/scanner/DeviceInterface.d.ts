@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from 'node:events';
 export interface DeviceInterface extends EventEmitter {
     id: string;
     uuid: string;
@@ -20,8 +20,8 @@ export interface DeviceInterface extends EventEmitter {
     readCharacteristics(): Promise<boolean>;
     toJSON(asObject: boolean): string | Object;
     toString(): string;
-    on(event: "connected", listener: () => void): this;
-    on(event: "disconnected", listener: () => void): this;
+    on(event: 'connected', listener: () => void): this;
+    on(event: 'disconnected', listener: () => void): this;
 }
 export interface ServiceInterface {
     uuid: string;
@@ -50,7 +50,7 @@ export interface CharacteristicInterface extends EventEmitter {
     subscribe(): Promise<void>;
     toJSON(asObject: boolean): string | Object;
     toString(): string;
-    on(event: "dataRead", listener: (data: Buffer) => void): this;
+    on(event: 'dataRead', listener: (data: Buffer) => void): this;
 }
 export interface DescriptorInterface {
     uuid: string;

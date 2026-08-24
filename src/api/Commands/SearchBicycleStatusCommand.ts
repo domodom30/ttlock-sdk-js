@@ -4,7 +4,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class SearchBicycleStatusCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_SEARCH_BICYCLE_STATUS;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_SEARCH_BICYCLE_STATUS;
 
   private lockStatus?: number;
 
@@ -19,7 +19,7 @@ export class SearchBicycleStatusCommand extends Command {
   }
 
   getLockStatus(): number {
-    if (typeof this.lockStatus != "undefined") {
+    if (this.lockStatus !== undefined) {
       return this.lockStatus;
     } else {
       return -1;

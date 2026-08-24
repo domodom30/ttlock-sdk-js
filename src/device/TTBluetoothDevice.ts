@@ -44,8 +44,8 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   }
 
   updateFromDevice(device?: DeviceInterface): void {
-    if (typeof device != "undefined") {
-      if (typeof this.device != "undefined") {
+    if (device !== undefined) {
+      if (this.device !== undefined) {
         this.device.removeAllListeners();
       }
       this.device = device;
@@ -53,7 +53,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       this.device.on("disconnected", this.onDeviceDisconnected.bind(this));
     }
 
-    if (typeof this.device != "undefined") {
+    if (this.device !== undefined) {
       this.id = this.device.id;
       this.name = this.device.name;
       this.rssi = this.device.rssi;
@@ -66,7 +66,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   }
 
   async connect(): Promise<boolean> {
-    if (typeof this.device != "undefined" && this.device.connectable) {
+    if (this.device !== undefined && this.device.connectable) {
       // stop scan
       await this.scanner.stopScan();
       if (await this.device.connect()) {
@@ -131,7 +131,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   }
 
   private async readBasicInfo() {
-    if (typeof this.device != "undefined") {
+    if (this.device !== undefined) {
       log("BLE Device discover services start");
       await this.device.discoverServices();
       log("BLE Device discover services end");
@@ -139,7 +139,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       let service: ServiceInterface | undefined;
       if (this.device.services.has("1800")) {
         service = this.device.services.get("1800");
-        if (typeof service != "undefined") {
+        if (service !== undefined) {
           log("BLE Device read characteristics start");
           await service.readCharacteristics();
           log("BLE Device read characteristics end");
@@ -148,7 +148,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       }
       if (this.device.services.has("180a")) {
         service = this.device.services.get("180a");
-        if (typeof service != "undefined") {
+        if (service !== undefined) {
           log("BLE Device read characteristics start");
           await service.readCharacteristics();
           log("BLE Device read characteristics end");
@@ -162,22 +162,22 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   }
 
   private async subscribe(): Promise<boolean> {
-    if (typeof this.device != "undefined") {
+    if (this.device !== undefined) {
       let service: ServiceInterface | undefined;
       if (this.device.services.has("1910")) {
         service = this.device.services.get("1910");
       }
-      if (typeof service != "undefined") {
+      if (service !== undefined) {
         await service.readCharacteristics();
         if (service.characteristics.has("fff4")) {
           const characteristic = service.characteristics.get("fff4");
-          if (typeof characteristic != "undefined") {
+          if (characteristic !== undefined) {
             await characteristic.subscribe();
             characteristic.on("dataRead", this.onIncomingData.bind(this));
             // does not seem to be required
             // await characteristic.discoverDescriptors();
             // const descriptor = characteristic.descriptors.get("2902");
-            // if (typeof descriptor != "undefined") {
+            // if (descriptor !== undefined) {
             //   console.log("Subscribing to descriptor notifications");
             //   await descriptor.writeValue(Buffer.from([0x01, 0x00])); // BE
             //   // await descriptor.writeValue(Buffer.from([0x00, 0x01])); // LE
@@ -206,11 +206,9 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       ]);
       // write with 20 bytes MTU
       const service = this.device?.services.get("1910");
-      // `typeof` returns a string, so comparing against the value `undefined`
-      // was always true; compare against the string "undefined" instead.
-      if (typeof service != "undefined") {
+      if (service !== undefined) {
         const characteristic = service?.characteristics.get("fff2");
-        if (typeof characteristic != "undefined") {
+        if (characteristic !== undefined) {
           if (waitForResponse) {
             let retry = 0;
             let crcs: number[] = [];
@@ -257,11 +255,11 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
                   throw new Error("Timeout waiting for response");
                 }
                 response = this.responses.pop();
-                if (typeof response != "undefined") {
+                if (response !== undefined) {
                   crcs.push(response.getCrc());
                 }
                 retry++;
-              } while (typeof response == "undefined" || (!response.isCrcOk() && !ignoreCrc && retry <= 2));
+              } while (response === undefined || (!response.isCrcOk() && !ignoreCrc && retry <= 2));
               if (!response.isCrcOk() && !ignoreCrc) {
                 // check if all CRCs match and auto-ignore bad CRC
                 if (crcs.length > 1) {
@@ -370,7 +368,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
 
   private putCharacteristicValue(service: ServiceInterface, uuid: string, property: string) {
     const value = service.characteristics.get(uuid);
-    if (typeof value != "undefined" && typeof value.lastValue != "undefined") {
+    if (value !== undefined && value.lastValue !== undefined) {
       Reflect.set(this, property, value.lastValue.toString());
     }
   }

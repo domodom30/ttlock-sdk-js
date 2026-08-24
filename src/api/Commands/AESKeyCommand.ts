@@ -4,7 +4,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class AESKeyCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_GET_AES_KEY;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_GET_AES_KEY;
 
   private aesKey?: Buffer;
 

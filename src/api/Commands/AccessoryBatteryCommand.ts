@@ -15,7 +15,7 @@ export enum AccessoryType {
 }
 
 export class AccessoryBatteryCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_ACCESSORY_BATTERY;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_ACCESSORY_BATTERY;
 
   private accessoryType?: AccessoryType;
   private batteryLevel?: number;
@@ -28,7 +28,7 @@ export class AccessoryBatteryCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.accessoryType !== 'undefined') {
+    if (this.accessoryType !== undefined) {
       return Buffer.from([this.accessoryType]);
     }
     // Default: query door sensor

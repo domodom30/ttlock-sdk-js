@@ -8,7 +8,7 @@ import { PwdOperateType } from "../../constant/PwdOperateType";
 import { Command } from "../Command";
 
 export class ManageKeyboardPasswordCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_MANAGE_KEYBOARD_PASSWORD;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_MANAGE_KEYBOARD_PASSWORD;
 
   private opType: PwdOperateType = PwdOperateType.PWD_OPERATE_TYPE_ADD;
   private type?: KeyboardPwdType;
@@ -123,7 +123,7 @@ export class ManageKeyboardPasswordCommand extends Command {
   }
 
   private buildAdd(): Buffer {
-    if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+    if (this.type !== undefined && this.passCode !== undefined && this.startDate && this.endDate) {
       let data: Buffer;
       // PERMANENT writes startDate only (5 bytes); other types write startDate + endDate (10 bytes).
       // The allocation must match the write logic below — swapping the condition was the original bug
@@ -163,7 +163,7 @@ export class ManageKeyboardPasswordCommand extends Command {
   }
 
   private buildRecover(): Buffer {
-    if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+    if (this.type !== undefined && this.passCode !== undefined && this.startDate && this.endDate) {
       let data: Buffer;
       if (this.type == KeyboardPwdType.PWD_TYPE_PERMANENT) {
         data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5);
@@ -200,7 +200,7 @@ export class ManageKeyboardPasswordCommand extends Command {
   }
 
   private buildDel(): Buffer {
-    if (typeof this.type != "undefined" && typeof this.oldPassCode != "undefined") {
+    if (this.type !== undefined && this.oldPassCode !== undefined) {
       let data: Buffer = Buffer.alloc(1 + 1 + 1 + this.oldPassCode.length);
       let index = 0;
       data.writeUInt8(this.opType, index++);
@@ -218,7 +218,7 @@ export class ManageKeyboardPasswordCommand extends Command {
   }
 
   private buildEdit(): Buffer {
-    if (typeof this.type != "undefined" && typeof this.oldPassCode != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+    if (this.type !== undefined && this.oldPassCode !== undefined && this.passCode !== undefined && this.startDate && this.endDate) {
       let data: Buffer = Buffer.alloc(1 + 1 + 1 + this.oldPassCode.length + 1 + this.passCode.length + 5 + 5);
       let index = 0;
       data.writeUInt8(this.opType, index++);
