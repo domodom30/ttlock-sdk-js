@@ -9,7 +9,7 @@ export interface KeyboardPassCode {
     endDate?: string;
 }
 export declare class GetKeyboardPasswordsCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private sequence?;
     private passCodes?;
     protected processData(): void;

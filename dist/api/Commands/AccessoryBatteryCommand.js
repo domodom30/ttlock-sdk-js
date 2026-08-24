@@ -22,7 +22,7 @@ class AccessoryBatteryCommand extends Command_1.Command {
         }
     }
     build() {
-        if (typeof this.accessoryType !== 'undefined') {
+        if (this.accessoryType !== undefined) {
             return Buffer.from([this.accessoryType]);
         }
         // Default: query door sensor

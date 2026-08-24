@@ -60,45 +60,59 @@ class NobleDevice extends events_1.EventEmitter {
         return this.busy;
     }
     async connect(timeout = 10) {
-        if (this.connectable && !this.connected && !this.connecting) {
-            if (this.peripheral.state == "connected") {
-                this.connected = true;
-                return true;
-            }
-            this.connecting = true;
-            log("Peripheral connect start");
-            this.peripheral.connect((error) => {
-                if (typeof error != "undefined" && error != null) {
-                    log("Peripheral connect error:", error);
-                }
-                else {
-                    log("Peripheral state:", this.peripheral.state);
-                    if (this.peripheral.state == "connected") {
-                        this.connected = true;
-                        this.connecting = false;
-                    }
-                }
-            });
-            let timeoutCycles = timeout * 10;
-            do {
-                await (0, timingUtil_1.sleep)(100);
-                timeoutCycles--;
-            } while (!this.connected && timeoutCycles > 0 && this.connecting);
-            await (0, timingUtil_1.sleep)(10);
-            if (!this.connected) {
-                this.connecting = false;
+        if (!this.connectable || this.connected || this.connecting) {
+            log("Peripheral state:", this.peripheral.state);
+            return false;
+        }
+        if (this.peripheral.state == "connected") {
+            this.connected = true;
+            return true;
+        }
+        this.connecting = true;
+        log("Peripheral connect start");
+        // Settle on the native connect callback (success or error) rather than
+        // polling: this resolves as soon as the outcome is known, and clearing the
+        // timeout guarantees a connection that completes in time is never torn down
+        // by cancelConnect. A late success after the timeout has fired is ignored
+        // (already cancelled); onDisconnect then cleans up the flags.
+        const connected = await new Promise((resolve) => {
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (settled)
+                    return;
+                settled = true;
+                log("Peripheral connect timeout");
                 try {
                     this.peripheral.cancelConnect();
                 }
-                catch (error) { }
-                return false;
-            }
-            log("Device emiting connected");
-            this.emit("connected");
-            return true;
+                catch (error) { /* swallow */ }
+                resolve(false);
+            }, timeout * 1000);
+            this.peripheral.connect((error) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                clearTimeout(timer);
+                if (error !== undefined && error != null) {
+                    log("Peripheral connect error:", error);
+                    resolve(false);
+                }
+                else {
+                    log("Peripheral state:", this.peripheral.state);
+                    resolve(this.peripheral.state == "connected");
+                }
+            });
+        });
+        if (!connected) {
+            this.connecting = false;
+            return false;
         }
-        log("Peripheral state:", this.peripheral.state);
-        return false;
+        this.connected = true;
+        this.connecting = false;
+        log("Device emiting connected");
+        this.emit("connected");
+        return true;
     }
     async disconnect() {
         if (this.connectable && this.connected) {
@@ -192,7 +206,7 @@ class NobleDevice extends events_1.EventEmitter {
                     if (characteristic.properties.includes("read")) {
                         log("Reading", uuid);
                         const data = await characteristic.read();
-                        if (typeof data != "undefined") {
+                        if (data !== undefined) {
                             log("Data", data.toString("ascii"));
                         }
                     }

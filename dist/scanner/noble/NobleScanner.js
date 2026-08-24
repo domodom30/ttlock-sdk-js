@@ -27,7 +27,7 @@ class NobleScanner extends events_1.EventEmitter {
         this.noble = noble_1.default;
     }
     initNoble() {
-        if (typeof this.noble != "undefined") {
+        if (this.noble !== undefined) {
             this.noble.on("discover", this.onDiscoverBound);
             this.noble.on("stateChange", this.onStateChangeBound);
             this.noble.on("scanStart", this.onScanStartBound);
@@ -35,7 +35,7 @@ class NobleScanner extends events_1.EventEmitter {
         }
     }
     destroy() {
-        if (typeof this.noble != "undefined") {
+        if (this.noble !== undefined) {
             this.noble.removeListener("discover", this.onDiscoverBound);
             this.noble.removeListener("stateChange", this.onStateChangeBound);
             this.noble.removeListener("scanStart", this.onScanStartBound);
@@ -67,7 +67,7 @@ class NobleScanner extends events_1.EventEmitter {
     }
     async startNobleScan(allowDuplicates = true) {
         try {
-            if (typeof this.noble != "undefined") {
+            if (this.noble !== undefined) {
                 await this.noble.startScanningAsync(this.uuids, allowDuplicates);
                 this.scannerState = "scanning";
                 return true;
@@ -83,7 +83,7 @@ class NobleScanner extends events_1.EventEmitter {
     }
     async stopNobleScan() {
         try {
-            if (typeof this.noble != "undefined") {
+            if (this.noble !== undefined) {
                 await this.noble.stopScanningAsync();
                 this.scannerState = "stopped";
                 return true;
@@ -121,7 +121,7 @@ class NobleScanner extends events_1.EventEmitter {
         }
         else {
             let nobleDevice = this.devices.get(peripheral.id);
-            if (typeof nobleDevice != "undefined") {
+            if (nobleDevice !== undefined) {
                 nobleDevice.updateFromPeripheral();
                 if (this.checkPeripheralAdvertisement(peripheral)) {
                     this.emit("discover", nobleDevice);
@@ -130,11 +130,11 @@ class NobleScanner extends events_1.EventEmitter {
         }
     }
     checkPeripheralAdvertisement(peripheral) {
-        if (typeof this.uuids == "undefined" || this.uuids.length == 0) {
+        if (this.uuids === undefined || this.uuids.length == 0) {
             return true;
         }
-        if (typeof peripheral.advertisement != "undefined" &&
-            typeof peripheral.advertisement.serviceUuids != "undefined" &&
+        if (peripheral.advertisement !== undefined &&
+            peripheral.advertisement.serviceUuids !== undefined &&
             peripheral.advertisement.serviceUuids.length > 0) {
             for (let service of peripheral.advertisement.serviceUuids) {
                 if (this.uuids.indexOf(service.replace("0x", "")) != -1) {

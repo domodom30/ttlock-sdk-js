@@ -12,7 +12,7 @@ export interface Fingerprint {
 }
 
 export class ManageFRCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_FR_MANAGE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_FR_MANAGE;
 
   private opType?: ICOperate;
   private sequence?: number;
@@ -90,10 +90,10 @@ export class ManageFRCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.opType != "undefined") {
+    if (this.opType !== undefined) {
       switch (this.opType) {
         case ICOperate.FR_SEARCH:
-          if (typeof this.sequence != "undefined") {
+          if (this.sequence !== undefined) {
             const data = Buffer.alloc(3);
             data.writeUInt8(this.opType, 0);
             data.writeUInt16BE(this.sequence, 1);
@@ -102,7 +102,7 @@ export class ManageFRCommand extends Command {
           break;
         case ICOperate.ADD:
         case ICOperate.MODIFY:
-          if (typeof this.fpNumber == "undefined") {
+          if (this.fpNumber === undefined) {
             return Buffer.from([this.opType]);
           } else {
             if (this.fpNumber && this.startDate && this.endDate) {

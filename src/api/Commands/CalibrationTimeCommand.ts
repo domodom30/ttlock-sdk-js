@@ -6,7 +6,7 @@ import moment from "moment";
 import { dateTimeToBuffer } from "../../util/timeUtil";
 
 export class CalibrationTimeCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_TIME_CALIBRATE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_TIME_CALIBRATE;
   private time?: string;
 
   protected processData(): void {
@@ -14,7 +14,7 @@ export class CalibrationTimeCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.time == "undefined") {
+    if (this.time === undefined) {
       this.time = moment().format("YYMMDDHHmmss");
     }
     return dateTimeToBuffer(this.time);

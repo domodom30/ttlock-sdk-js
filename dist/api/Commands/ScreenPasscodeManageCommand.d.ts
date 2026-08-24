@@ -1,7 +1,7 @@
 import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 export declare class ScreenPasscodeManageCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType;
     private opValue?;
     protected processData(): void;

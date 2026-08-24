@@ -2,7 +2,7 @@ import { CommandType } from "../../constant/CommandType";
 import { ConfigRemoteUnlock } from "../../constant/ConfigRemoteUnlock";
 import { Command } from "../Command";
 export declare class ControlRemoteUnlockCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType;
     private opValue?;
     private batteryCapacity?;

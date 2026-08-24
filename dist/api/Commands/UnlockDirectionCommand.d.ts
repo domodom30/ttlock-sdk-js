@@ -16,7 +16,7 @@ export declare enum UnlockDirection {
  * Requires FeatureValue.UNLOCK_DIRECTION to be set in the lock's feature list.
  */
 export declare class UnlockDirectionCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     private opType;
     private direction?;
     protected processData(): void;

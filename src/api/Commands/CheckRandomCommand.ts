@@ -4,7 +4,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class CheckRandomCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_CHECK_RANDOM;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_CHECK_RANDOM;
 
   private sum?: number;
 

@@ -9,7 +9,7 @@ class CheckUserTimeCommand extends Command_1.Command {
         // nothing to do
     }
     build() {
-        if (typeof this.uid != "undefined" && this.startDate && this.endDate && typeof this.lockFlagPos != "undefined") {
+        if (this.uid !== undefined && this.startDate && this.endDate && this.lockFlagPos !== undefined) {
             const data = Buffer.alloc(17); //5+5+3+4
             (0, timeUtil_1.dateTimeToBuffer)(this.startDate).copy(data, 0);
             // lockFlagPos (4 bytes) is written at offset 9 first, then endDate (5 bytes

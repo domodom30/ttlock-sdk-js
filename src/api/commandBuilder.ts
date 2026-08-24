@@ -9,7 +9,7 @@ const commandIndex: Map<CommandType, CommandInterface> = (() => {
   for (const name of Object.keys(commands)) {
     if (name === "UnknownCommand") continue;
     const candidate = Reflect.get(commands, name);
-    if (typeof candidate === "function" && typeof candidate.COMMAND_TYPE !== "undefined") {
+    if (typeof candidate === "function" && candidate.COMMAND_TYPE !== undefined) {
       map.set(candidate.COMMAND_TYPE, candidate as CommandInterface);
     }
   }

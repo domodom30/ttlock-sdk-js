@@ -6,7 +6,7 @@ import { Command } from "../Command";
 import { UnlockDataInterface } from "./UnlockCommand";
 
 export class LockCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_FUNCTION_LOCK;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_FUNCTION_LOCK;
 
   private sum?: number;
   private uid?: number;
@@ -58,7 +58,7 @@ export class LockCommand extends Command {
   }
 
   getBatteryCapacity(): number {
-    if (typeof this.batteryCapacity != "undefined") {
+    if (this.batteryCapacity !== undefined) {
       return this.batteryCapacity;
     } else {
       return -1;

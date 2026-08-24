@@ -118,7 +118,7 @@ class ManageKeyboardPasswordCommand extends Command_1.Command {
         return true;
     }
     buildAdd() {
-        if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+        if (this.type !== undefined && this.passCode !== undefined && this.startDate && this.endDate) {
             let data;
             // PERMANENT writes startDate only (5 bytes); other types write startDate + endDate (10 bytes).
             // The allocation must match the write logic below — swapping the condition was the original bug
@@ -155,7 +155,7 @@ class ManageKeyboardPasswordCommand extends Command_1.Command {
         }
     }
     buildRecover() {
-        if (typeof this.type != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+        if (this.type !== undefined && this.passCode !== undefined && this.startDate && this.endDate) {
             let data;
             if (this.type == KeyboardPwdType_1.KeyboardPwdType.PWD_TYPE_PERMANENT) {
                 data = Buffer.alloc(1 + 1 + 1 + this.passCode.length + 5);
@@ -189,7 +189,7 @@ class ManageKeyboardPasswordCommand extends Command_1.Command {
         }
     }
     buildDel() {
-        if (typeof this.type != "undefined" && typeof this.oldPassCode != "undefined") {
+        if (this.type !== undefined && this.oldPassCode !== undefined) {
             let data = Buffer.alloc(1 + 1 + 1 + this.oldPassCode.length);
             let index = 0;
             data.writeUInt8(this.opType, index++);
@@ -205,7 +205,7 @@ class ManageKeyboardPasswordCommand extends Command_1.Command {
         }
     }
     buildEdit() {
-        if (typeof this.type != "undefined" && typeof this.oldPassCode != "undefined" && typeof this.passCode != "undefined" && this.startDate && this.endDate) {
+        if (this.type !== undefined && this.oldPassCode !== undefined && this.passCode !== undefined && this.startDate && this.endDate) {
             let data = Buffer.alloc(1 + 1 + 1 + this.oldPassCode.length + 1 + this.passCode.length + 5 + 5);
             let index = 0;
             data.writeUInt8(this.opType, index++);

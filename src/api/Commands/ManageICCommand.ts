@@ -12,7 +12,7 @@ export interface ICCard {
 }
 
 export class ManageICCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_IC_MANAGE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_IC_MANAGE;
 
   private opType?: ICOperate;
   private sequence?: number;
@@ -94,7 +94,7 @@ export class ManageICCommand extends Command {
     if (this.opType) {
       switch (this.opType) {
         case ICOperate.IC_SEARCH:
-          if (typeof this.sequence != "undefined") {
+          if (this.sequence !== undefined) {
             let data = Buffer.alloc(3);
             data.writeUInt8(this.opType, 0);
             data.writeUInt16BE(this.sequence, 1);
@@ -103,7 +103,7 @@ export class ManageICCommand extends Command {
           break;
         case ICOperate.ADD:
         case ICOperate.MODIFY:
-          if (typeof this.cardNumber == "undefined") {
+          if (this.cardNumber === undefined) {
             return Buffer.from([this.opType]);
           } else {
             if (this.cardNumber && this.startDate && this.endDate) {
@@ -176,7 +176,7 @@ export class ManageICCommand extends Command {
   }
 
   setAdd(cardNumber?: string, startDate?: string, endDate?: string): void {
-    if (typeof cardNumber != "undefined" && typeof startDate != "undefined" && typeof endDate != "undefined") {
+    if (cardNumber !== undefined && startDate !== undefined && endDate !== undefined) {
       this.cardNumber = cardNumber;
       this.startDate = startDate;
       this.endDate = endDate;

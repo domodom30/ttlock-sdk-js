@@ -63,7 +63,7 @@ export class TTDevice extends EventEmitter {
     Object.getOwnPropertyNames(temp).forEach((key) => {
       if (!excludedKeys.has(key)) {
         const val = Reflect.get(this, key);
-        if (typeof val != 'undefined' && ((typeof val == "string" && val != "") || typeof val != "string")) {
+        if (val !== undefined && ((typeof val == "string" && val != "") || typeof val != "string")) {
           if (Buffer.isBuffer(val)) {
             if (val.length > 0) {
               Reflect.set(json, key, val.toString('hex'));

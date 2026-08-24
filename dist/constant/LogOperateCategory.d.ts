@@ -1,21 +1,21 @@
 import { LogOperate } from './LogOperate';
 export declare const LogOperateCategory: {
-    /** Tous les déverrouillages réussis */
+    /** All successful unlocks */
     UNLOCK: LogOperate[];
-    /** Tous les verrouillages */
+    /** All locks */
     LOCK: LogOperate[];
-    /** Tentatives échouées */
+    /** Failed attempts */
     FAILED: LogOperate[];
-    /** Gestion codes / mots de passe */
+    /** Passcode / password management */
     PASSCODE: LogOperate[];
-    /** Gestion cartes IC */
+    /** IC card management */
     IC: LogOperate[];
-    /** Gestion empreintes digitales */
+    /** Fingerprint management */
     FINGERPRINT: LogOperate[];
-    /** Alarmes et alertes */
+    /** Alarms and alerts */
     ALARM: LogOperate[];
-    /** Événements système */
+    /** System events */
     SYSTEM: LogOperate[];
-    /** Périphériques sans fil */
+    /** Wireless peripherals */
     WIRELESS: LogOperate[];
 };

@@ -18,7 +18,7 @@ export interface PassageModeData {
 }
 
 export class PassageModeCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_CONFIGURE_PASSAGE_MODE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_CONFIGURE_PASSAGE_MODE;
 
   opType: PassageModeOperate = PassageModeOperate.QUERY;
   sequence?: number;
@@ -51,7 +51,7 @@ export class PassageModeCommand extends Command {
   }
 
   build(): Buffer {
-    if (this.opType == PassageModeOperate.QUERY && typeof this.sequence != "undefined") {
+    if (this.opType == PassageModeOperate.QUERY && this.sequence !== undefined) {
       return Buffer.from([this.opType, this.sequence]);
     } else if (this.dataIn) {
       return Buffer.from([

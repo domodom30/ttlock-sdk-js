@@ -26,7 +26,7 @@ class ScreenPasscodeManageCommand extends Command_1.Command {
         if (this.opType == ActionType_1.ActionType.GET) {
             return Buffer.from([this.opType]);
         }
-        else if (this.opType == ActionType_1.ActionType.SET && typeof this.opValue != "undefined") {
+        else if (this.opType == ActionType_1.ActionType.SET && this.opValue !== undefined) {
             return Buffer.from([this.opType, this.opValue]);
         }
         else {

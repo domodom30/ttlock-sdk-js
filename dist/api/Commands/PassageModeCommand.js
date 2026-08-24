@@ -36,7 +36,7 @@ class PassageModeCommand extends Command_1.Command {
         }
     }
     build() {
-        if (this.opType == PassageModeOperate_1.PassageModeOperate.QUERY && typeof this.sequence != "undefined") {
+        if (this.opType == PassageModeOperate_1.PassageModeOperate.QUERY && this.sequence !== undefined) {
             return Buffer.from([this.opType, this.sequence]);
         }
         else if (this.dataIn) {

@@ -7,22 +7,22 @@ const Command_1 = require("../Command");
 class AudioManageCommand extends Command_1.Command {
     constructor() {
         super(...arguments);
-        this.opType = AudioManage_1.AudioManage.QUERY;
+        this.opType = AudioManage_1.AudioManageOperation.QUERY;
     }
     processData() {
         if (this.commandData && this.commandData.length >= 2) {
             this.batteryCapacity = this.commandData.readUInt8(0);
             this.opType = this.commandData.readUInt8(1);
-            if (this.opType == AudioManage_1.AudioManage.QUERY && this.commandData.length >= 3) {
+            if (this.opType == AudioManage_1.AudioManageOperation.QUERY && this.commandData.length >= 3) {
                 this.opValue = this.commandData.readUInt8(2);
             }
         }
     }
     build() {
-        if (this.opType == AudioManage_1.AudioManage.QUERY) {
+        if (this.opType == AudioManage_1.AudioManageOperation.QUERY) {
             return Buffer.from([this.opType]);
         }
-        else if (this.opType == AudioManage_1.AudioManage.MODIFY && typeof this.opValue != "undefined") {
+        else if (this.opType == AudioManage_1.AudioManageOperation.MODIFY && this.opValue !== undefined) {
             return Buffer.from([this.opType, this.opValue]);
         }
         else {
@@ -31,15 +31,15 @@ class AudioManageCommand extends Command_1.Command {
     }
     setNewValue(opValue) {
         this.opValue = opValue;
-        this.opType = AudioManage_1.AudioManage.MODIFY;
+        this.opType = AudioManage_1.AudioManageOperation.MODIFY;
     }
     getValue() {
-        if (typeof this.opValue != "undefined") {
+        if (this.opValue !== undefined) {
             return this.opValue;
         }
     }
     getBatteryCapacity() {
-        if (typeof this.batteryCapacity != "undefined") {
+        if (this.batteryCapacity !== undefined) {
             return this.batteryCapacity;
         }
         else {

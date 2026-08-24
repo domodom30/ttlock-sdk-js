@@ -19,7 +19,7 @@ class ControlLampCommand extends Command_1.Command {
         if (this.opType == LampManage_1.LampManage.QUERY) {
             return Buffer.from([this.opType]);
         }
-        if (this.opType == LampManage_1.LampManage.MODIFY && typeof this.opValue !== "undefined") {
+        if (this.opType == LampManage_1.LampManage.MODIFY && this.opValue !== undefined) {
             return Buffer.from([this.opType, this.opValue]);
         }
         return Buffer.from([]);

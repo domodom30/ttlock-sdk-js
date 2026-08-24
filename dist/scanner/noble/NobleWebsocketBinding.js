@@ -78,7 +78,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
         let { type, peripheralUuid, address, addressType, connectable, advertisement, rssi, serviceUuids, serviceUuid, includedServiceUuids, characteristics, characteristicUuid, isNotification, state, descriptors, descriptorUuid, handle, } = event;
         const data = event.data ? Buffer.from(event.data, "hex") : null;
         if (type === "auth") {
-            if (typeof event.challenge != "undefined" &&
+            if (event.challenge !== undefined &&
                 event.challenge.length == 32) {
                 const challenge = crypto_js_1.default.enc.Hex.parse(event.challenge);
                 const response = crypto_js_1.default.AES.encrypt(this.credentials, this.aesKey, {
@@ -118,7 +118,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
             }
         }
         else if (type === "discover") {
-            if (typeof advertisement != "undefined") {
+            if (advertisement !== undefined) {
                 const advertisementObj = {
                     localName: advertisement.localName,
                     txPowerLevel: advertisement.txPowerLevel,
@@ -145,7 +145,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
         }
         else if (type === "connect") {
             const peripheral = this.peripherals.get(peripheralUuid);
-            if (typeof peripheral != "undefined") {
+            if (peripheral !== undefined) {
                 peripheral.connected = true;
                 peripheral.connecting = false;
                 peripheral.bufferedConnect = false;
@@ -154,7 +154,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
         }
         else if (type === "disconnect") {
             const peripheral = this.peripherals.get(peripheralUuid);
-            if (typeof peripheral != "undefined") {
+            if (peripheral !== undefined) {
                 peripheral.connected = false;
                 peripheral.connecting = false;
                 peripheral.bufferedConnect = false;
@@ -237,7 +237,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     connect(deviceUuid) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined" &&
+        if (peripheral !== undefined &&
             !peripheral.connected &&
             !peripheral.connecting) {
             peripheral.connecting = true;
@@ -249,7 +249,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     disconnect(deviceUuid) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "disconnect",
                 peripheralUuid: peripheral.uuid,
@@ -258,7 +258,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     updateRssi(deviceUuid) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "updateRssi",
                 peripheralUuid: peripheral.uuid,
@@ -267,7 +267,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     discoverServices(deviceUuid, uuids) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "discoverServices",
                 peripheralUuid: peripheral.uuid,
@@ -277,7 +277,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     discoverIncludedServices(deviceUuid, serviceUuid, serviceUuids) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "discoverIncludedServices",
                 peripheralUuid: peripheral.uuid,
@@ -288,7 +288,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     discoverCharacteristics(deviceUuid, serviceUuid, characteristicUuids) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "discoverCharacteristics",
                 peripheralUuid: peripheral.uuid,
@@ -299,7 +299,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     read(deviceUuid, serviceUuid, characteristicUuid) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "read",
                 peripheralUuid: peripheral.uuid,
@@ -310,7 +310,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     write(deviceUuid, serviceUuid, characteristicUuid, data, withoutResponse) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "write",
                 peripheralUuid: peripheral.uuid,
@@ -323,7 +323,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     broadcast(deviceUuid, serviceUuid, characteristicUuid, broadcast) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "broadcast",
                 peripheralUuid: peripheral.uuid,
@@ -335,7 +335,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     notify(deviceUuid, serviceUuid, characteristicUuid, notify) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "notify",
                 peripheralUuid: peripheral.uuid,
@@ -347,7 +347,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     discoverDescriptors(deviceUuid, serviceUuid, characteristicUuid) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "discoverDescriptors",
                 peripheralUuid: peripheral.uuid,
@@ -358,7 +358,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     readValue(deviceUuid, serviceUuid, characteristicUuid, descriptorUuid) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "readValue",
                 peripheralUuid: peripheral.uuid,
@@ -370,7 +370,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     writeValue(deviceUuid, serviceUuid, characteristicUuid, descriptorUuid, data) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "writeValue",
                 peripheralUuid: peripheral.uuid,
@@ -383,7 +383,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     readHandle(deviceUuid, handle) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "readHandle",
                 peripheralUuid: peripheral.uuid,
@@ -393,7 +393,7 @@ class NobleWebsocketBinding extends events_1.EventEmitter {
     }
     writeHandle(deviceUuid, handle, data, withoutResponse) {
         const peripheral = this.peripherals.get(deviceUuid);
-        if (typeof peripheral != "undefined") {
+        if (peripheral !== undefined) {
             this.sendCommand({
                 action: "writeHandle",
                 peripheralUuid: peripheral.uuid,

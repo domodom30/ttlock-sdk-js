@@ -2,7 +2,7 @@
 
 export { APICommand } from './APICommand';
 export { ActionType } from './ActionType';
-export { AudioManage } from './AudioManage';
+export { AudioManage, AudioManageOperation } from './AudioManage';
 export { AutoLockOperate } from './AutoLockOperate';
 export { CallbackOperationType } from './CallbackOperationType';
 export { CommandResponse } from './CommandResponse';

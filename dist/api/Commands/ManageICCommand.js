@@ -75,7 +75,7 @@ class ManageICCommand extends Command_1.Command {
         if (this.opType) {
             switch (this.opType) {
                 case ICOperate_1.ICOperate.IC_SEARCH:
-                    if (typeof this.sequence != "undefined") {
+                    if (this.sequence !== undefined) {
                         let data = Buffer.alloc(3);
                         data.writeUInt8(this.opType, 0);
                         data.writeUInt16BE(this.sequence, 1);
@@ -84,7 +84,7 @@ class ManageICCommand extends Command_1.Command {
                     break;
                 case ICOperate_1.ICOperate.ADD:
                 case ICOperate_1.ICOperate.MODIFY:
-                    if (typeof this.cardNumber == "undefined") {
+                    if (this.cardNumber === undefined) {
                         return Buffer.from([this.opType]);
                     }
                     else {
@@ -155,7 +155,7 @@ class ManageICCommand extends Command_1.Command {
         }
     }
     setAdd(cardNumber, startDate, endDate) {
-        if (typeof cardNumber != "undefined" && typeof startDate != "undefined" && typeof endDate != "undefined") {
+        if (cardNumber !== undefined && startDate !== undefined && endDate !== undefined) {
             this.cardNumber = cardNumber;
             this.startDate = startDate;
             this.endDate = endDate;

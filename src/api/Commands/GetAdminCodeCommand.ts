@@ -4,7 +4,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class GetAdminCodeCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_GET_ADMIN_CODE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_GET_ADMIN_CODE;
 
   private adminPasscode?: string;
 

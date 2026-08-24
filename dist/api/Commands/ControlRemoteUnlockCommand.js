@@ -22,7 +22,7 @@ class ControlRemoteUnlockCommand extends Command_1.Command {
         if (this.opType == ConfigRemoteUnlock_1.ConfigRemoteUnlock.OP_TYPE_SEARCH) {
             return Buffer.from([this.opType]);
         }
-        else if (this.opType == ConfigRemoteUnlock_1.ConfigRemoteUnlock.OP_TYPE_MODIFY && typeof this.opValue != "undefined") {
+        else if (this.opType == ConfigRemoteUnlock_1.ConfigRemoteUnlock.OP_TYPE_MODIFY && this.opValue !== undefined) {
             return Buffer.from([this.opType, this.opValue]);
         }
         else {
@@ -34,12 +34,12 @@ class ControlRemoteUnlockCommand extends Command_1.Command {
         this.opType = ConfigRemoteUnlock_1.ConfigRemoteUnlock.OP_TYPE_MODIFY;
     }
     getValue() {
-        if (typeof this.opValue != "undefined") {
+        if (this.opValue !== undefined) {
             return this.opValue;
         }
     }
     getBatteryCapacity() {
-        if (typeof this.batteryCapacity != "undefined") {
+        if (this.batteryCapacity !== undefined) {
             return this.batteryCapacity;
         }
         else {

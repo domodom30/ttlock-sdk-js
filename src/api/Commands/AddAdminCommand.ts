@@ -5,7 +5,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class AddAdminCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_ADD_ADMIN;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_ADD_ADMIN;
   private adminPs?: number;
   private unlockKey?: number;
 

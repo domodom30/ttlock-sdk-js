@@ -1,12 +1,13 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LogOperateCategory = exports.LogOperateNames = exports.PwdOperateType = exports.PassageModeType = exports.PassageModeOperate = exports.OperationType = exports.LogType = exports.LogOperate = exports.LockSoundVolume = exports.LockedStatus = exports.LockVersion = exports.LockType = exports.KeyboardPwdType = exports.ICOperate = exports.FeatureValue = exports.DeviceInfoEnum = exports.DateConstant = exports.CyclicUserType = exports.CyclicType = exports.CyclicOpType = exports.ControlAction = exports.ConfigRemoteUnlock = exports.CommandType = exports.describeFirmwareError = exports.FirmwareErrorDescriptions = exports.FirmwareErrorCode = exports.CommandResponse = exports.CallbackOperationType = exports.AutoLockOperate = exports.AudioManage = exports.ActionType = exports.APICommand = void 0;
+exports.LogOperateCategory = exports.LogOperateNames = exports.PwdOperateType = exports.PassageModeType = exports.PassageModeOperate = exports.OperationType = exports.LogType = exports.LogOperate = exports.LockSoundVolume = exports.LockedStatus = exports.LockVersion = exports.LockType = exports.KeyboardPwdType = exports.ICOperate = exports.FeatureValue = exports.DeviceInfoEnum = exports.DateConstant = exports.CyclicUserType = exports.CyclicType = exports.CyclicOpType = exports.ControlAction = exports.ConfigRemoteUnlock = exports.CommandType = exports.describeFirmwareError = exports.FirmwareErrorDescriptions = exports.FirmwareErrorCode = exports.CommandResponse = exports.CallbackOperationType = exports.AutoLockOperate = exports.AudioManageOperation = exports.AudioManage = exports.ActionType = exports.APICommand = void 0;
 var APICommand_1 = require("./APICommand");
 Object.defineProperty(exports, "APICommand", { enumerable: true, get: function () { return APICommand_1.APICommand; } });
 var ActionType_1 = require("./ActionType");
 Object.defineProperty(exports, "ActionType", { enumerable: true, get: function () { return ActionType_1.ActionType; } });
 var AudioManage_1 = require("./AudioManage");
 Object.defineProperty(exports, "AudioManage", { enumerable: true, get: function () { return AudioManage_1.AudioManage; } });
+Object.defineProperty(exports, "AudioManageOperation", { enumerable: true, get: function () { return AudioManage_1.AudioManageOperation; } });
 var AutoLockOperate_1 = require("./AutoLockOperate");
 Object.defineProperty(exports, "AutoLockOperate", { enumerable: true, get: function () { return AutoLockOperate_1.AutoLockOperate; } });
 var CallbackOperationType_1 = require("./CallbackOperationType");

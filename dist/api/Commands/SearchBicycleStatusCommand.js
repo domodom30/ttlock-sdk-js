@@ -13,7 +13,7 @@ class SearchBicycleStatusCommand extends Command_1.Command {
         return Buffer.from("SCIENER");
     }
     getLockStatus() {
-        if (typeof this.lockStatus != "undefined") {
+        if (this.lockStatus !== undefined) {
             return this.lockStatus;
         }
         else {

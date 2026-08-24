@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AESUtil = exports.defaultAESKey = void 0;
-const crypto_1 = __importDefault(require("crypto"));
+const node_crypto_1 = __importDefault(require("node:crypto"));
 const logger_1 = require("./logger");
 const log = (0, logger_1.createLogger)('ttlock:aes');
 /**
@@ -16,13 +16,13 @@ class AESUtil {
         if (source.length == 0) {
             return Buffer.from([]);
         }
-        if (typeof key == 'undefined') {
+        if (key === undefined) {
             key = exports.defaultAESKey;
         }
         if (key.length != 16) {
             throw new Error('Invalid key size: ' + key.length);
         }
-        const cipher = crypto_1.default.createCipheriv('aes-128-cbc', key, key);
+        const cipher = node_crypto_1.default.createCipheriv('aes-128-cbc', key, key);
         let encrypted = cipher.update(source);
         encrypted = Buffer.concat([encrypted, cipher.final()]);
         return encrypted;
@@ -31,13 +31,13 @@ class AESUtil {
         if (source.length == 0) {
             return Buffer.from([]);
         }
-        if (typeof key == 'undefined') {
+        if (key === undefined) {
             key = exports.defaultAESKey;
         }
         if (key.length != 16) {
             throw new Error('Invalid key size: ' + key.length);
         }
-        const cipher = crypto_1.default.createDecipheriv('aes-128-cbc', key, key);
+        const cipher = node_crypto_1.default.createDecipheriv('aes-128-cbc', key, key);
         try {
             let decrypted = cipher.update(source);
             decrypted = Buffer.concat([decrypted, cipher.final()]);

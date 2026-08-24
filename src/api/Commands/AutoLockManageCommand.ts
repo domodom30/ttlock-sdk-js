@@ -5,7 +5,7 @@ import { CommandType } from "../../constant/CommandType";
 import { Command } from "../Command";
 
 export class AutoLockManageCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_AUTO_LOCK_MANAGE;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_AUTO_LOCK_MANAGE;
 
   private opType: AutoLockOperate.SEARCH | AutoLockOperate.MODIFY = AutoLockOperate.SEARCH;
   private opValue?: number;
@@ -30,7 +30,7 @@ export class AutoLockManageCommand extends Command {
   build(): Buffer {
     if (this.opType == AutoLockOperate.SEARCH) {
       return Buffer.from([this.opType]);
-    } else if (typeof this.opValue != "undefined") {
+    } else if (this.opValue !== undefined) {
       return Buffer.from([
         this.opType,
         this.opValue >> 8,
@@ -47,7 +47,7 @@ export class AutoLockManageCommand extends Command {
   }
 
   getTime(): number {
-    if (typeof this.opValue != "undefined") {
+    if (this.opValue !== undefined) {
       return this.opValue;
     } else {
       return -1;

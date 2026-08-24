@@ -5,7 +5,7 @@ import { dateTimeToBuffer } from "../../util/timeUtil";
 import { Command } from "../Command";
 
 export class CheckUserTimeCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_CHECK_USER_TIME;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_CHECK_USER_TIME;
 
   private uid?: number;
   private startDate?: string;
@@ -17,7 +17,7 @@ export class CheckUserTimeCommand extends Command {
   }
 
   build(): Buffer {
-    if (typeof this.uid != "undefined" && this.startDate && this.endDate && typeof this.lockFlagPos != "undefined") {
+    if (this.uid !== undefined && this.startDate && this.endDate && this.lockFlagPos !== undefined) {
       const data = Buffer.alloc(17); //5+5+3+4
       dateTimeToBuffer(this.startDate).copy(data, 0);
       // lockFlagPos (4 bytes) is written at offset 9 first, then endDate (5 bytes

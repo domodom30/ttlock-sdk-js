@@ -8,7 +8,7 @@ import { Command } from "../Command";
  * The exact bit semantics depend on the lock model; raw + commonly-used flags are exposed.
  */
 export class GetSwitchStateCommand extends Command {
-  static COMMAND_TYPE: CommandType = CommandType.COMM_SWITCH;
+  static readonly COMMAND_TYPE: CommandType = CommandType.COMM_SWITCH;
 
   private rawState?: number;
 
@@ -28,14 +28,14 @@ export class GetSwitchStateCommand extends Command {
   }
 
   isPrivacyLockOn(): boolean | undefined {
-    return typeof this.rawState === "undefined" ? undefined : (this.rawState & 0x01) === 0x01;
+    return this.rawState === undefined ? undefined : (this.rawState & 0x01) === 0x01;
   }
 
   isTamperAlarmOn(): boolean | undefined {
-    return typeof this.rawState === "undefined" ? undefined : (this.rawState & 0x02) === 0x02;
+    return this.rawState === undefined ? undefined : (this.rawState & 0x02) === 0x02;
   }
 
   isResetButtonOn(): boolean | undefined {
-    return typeof this.rawState === "undefined" ? undefined : (this.rawState & 0x04) === 0x04;
+    return this.rawState === undefined ? undefined : (this.rawState & 0x04) === 0x04;
   }
 }

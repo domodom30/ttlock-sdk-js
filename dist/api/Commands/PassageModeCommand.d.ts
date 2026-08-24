@@ -14,7 +14,7 @@ export interface PassageModeData {
     endHour: string;
 }
 export declare class PassageModeCommand extends Command {
-    static COMMAND_TYPE: CommandType;
+    static readonly COMMAND_TYPE: CommandType;
     opType: PassageModeOperate;
     sequence?: number;
     dataOut?: PassageModeData[];

@@ -21,13 +21,13 @@ class GetSwitchStateCommand extends Command_1.Command {
         return this.rawState;
     }
     isPrivacyLockOn() {
-        return typeof this.rawState === "undefined" ? undefined : (this.rawState & 0x01) === 0x01;
+        return this.rawState === undefined ? undefined : (this.rawState & 0x01) === 0x01;
     }
     isTamperAlarmOn() {
-        return typeof this.rawState === "undefined" ? undefined : (this.rawState & 0x02) === 0x02;
+        return this.rawState === undefined ? undefined : (this.rawState & 0x02) === 0x02;
     }
     isResetButtonOn() {
-        return typeof this.rawState === "undefined" ? undefined : (this.rawState & 0x04) === 0x04;
+        return this.rawState === undefined ? undefined : (this.rawState & 0x04) === 0x04;
     }
 }
 exports.GetSwitchStateCommand = GetSwitchStateCommand;
