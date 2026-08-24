@@ -441,13 +441,14 @@ class TTLock extends TTLockApi_1.TTLockApi {
             throw new Error('Lock is in pairing mode');
         }
         const oldStatus = this.lockedStatus;
-        if (noCache || this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN) {
+        if (noCache || this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN || this.statusUnverified) {
             if (!this.isConnected()) {
                 throw new Error('Lock is not connected');
             }
             try {
                 log('========= check lock status');
                 this.lockedStatus = await this.searchBycicleStatusCommand();
+                this.statusUnverified = false;
                 log('========= check lock status', this.lockedStatus);
             }
             catch (error) {
@@ -1719,11 +1720,19 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     this.autoLockTime = await this.searchAutoLockTimeCommand();
                     log('========= autoLockTime:', this.autoLockTime);
                 }
-                if (this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN) {
+                if (this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN || this.statusUnverified) {
                     // Locked/unlocked status
                     log('========= check lock status');
+                    const oldStatus = this.lockedStatus;
                     this.lockedStatus = await this.searchBycicleStatusCommand();
+                    this.statusUnverified = false;
                     log('========= check lock status', this.lockedStatus);
+                    // Propagate a corrected status to event-based consumers: the advertising
+                    // path no longer asserts LOCKED, so a genuine re-lock is only discovered
+                    // by this active query and would otherwise never be signalled.
+                    if (oldStatus != this.lockedStatus) {
+                        this.emit(this.lockedStatus == LockedStatus_1.LockedStatus.LOCKED ? 'locked' : 'unlocked', this);
+                    }
                 }
                 if (this.featureList.has(FeatureValue_1.FeatureValue.AUDIO_MANAGEMENT) && this.lockSound == AudioManage_1.AudioManage.UNKNOWN) {
                     log('========= lockSound');

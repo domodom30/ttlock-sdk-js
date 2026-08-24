@@ -47,6 +47,14 @@ class TTLockApi extends events_1.EventEmitter {
     constructor(device, data) {
         super();
         this.adminAuth = false;
+        /**
+         * The BLE advertising 'isUnlock' bit only reliably signals "an unlock just
+         * happened" - it clears on its own after a short interval regardless of
+         * whether the door was ever re-locked (especially with autolock disabled).
+         * When it clears, we can no longer trust lockedStatus without an active
+         * status query, so we flag it here instead of assuming LOCKED.
+         */
+        this.statusUnverified = false;
         this.device = device;
         this.privateData = {};
         if (this.device.isUnlock) {
@@ -83,10 +91,15 @@ class TTLockApi extends events_1.EventEmitter {
         if (this.device.isUnlock) {
             paramsChanged.lockedStatus = this.lockedStatus != LockedStatus_1.LockedStatus.UNLOCKED;
             this.lockedStatus = LockedStatus_1.LockedStatus.UNLOCKED;
+            this.statusUnverified = false;
         }
         else {
-            paramsChanged.lockedStatus = this.lockedStatus != LockedStatus_1.LockedStatus.LOCKED;
-            this.lockedStatus = LockedStatus_1.LockedStatus.LOCKED;
+            // Don't trust "bit cleared" as proof the lock re-engaged - that only
+            // holds true if autolock is on. Leave lockedStatus as-is and require
+            // an active query on next connect to confirm the real state.
+            if (this.lockedStatus == LockedStatus_1.LockedStatus.UNLOCKED) {
+                this.statusUnverified = true;
+            }
         }
         if (paramsChanged.batteryCapacity || paramsChanged.lockedStatus || paramsChanged.newEvents) {
             log('Emmiting paramsChanged', paramsChanged);

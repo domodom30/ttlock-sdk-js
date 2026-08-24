@@ -509,7 +509,7 @@ export class TTLock extends TTLockApi implements TTLock {
 
     const oldStatus = this.lockedStatus;
 
-    if (noCache || this.lockedStatus == LockedStatus.UNKNOWN) {
+    if (noCache || this.lockedStatus == LockedStatus.UNKNOWN || this.statusUnverified) {
       if (!this.isConnected()) {
         throw new Error('Lock is not connected');
       }
@@ -517,6 +517,7 @@ export class TTLock extends TTLockApi implements TTLock {
       try {
         log('========= check lock status');
         this.lockedStatus = await this.searchBycicleStatusCommand();
+        this.statusUnverified = false;
         log('========= check lock status', this.lockedStatus);
       } catch (error) {
         log.error('Error getting lock status', error);
@@ -1902,9 +1903,16 @@ export class TTLock extends TTLockApi implements TTLock {
         if (this.lockedStatus == LockedStatus.UNKNOWN || this.statusUnverified) {
           // Locked/unlocked status
           log('========= check lock status');
+          const oldStatus = this.lockedStatus;
           this.lockedStatus = await this.searchBycicleStatusCommand();
           this.statusUnverified = false;
           log('========= check lock status', this.lockedStatus);
+          // Propagate a corrected status to event-based consumers: the advertising
+          // path no longer asserts LOCKED, so a genuine re-lock is only discovered
+          // by this active query and would otherwise never be signalled.
+          if (oldStatus != this.lockedStatus) {
+            this.emit(this.lockedStatus == LockedStatus.LOCKED ? 'locked' : 'unlocked', this);
+          }
         }
 
         if (this.featureList.has(FeatureValue.AUDIO_MANAGEMENT) && this.lockSound == AudioManage.UNKNOWN) {
