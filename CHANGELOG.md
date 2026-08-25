@@ -1,5 +1,82 @@
 # Changelog
 
+## [0.8.1]
+
+Command execution latency pass. No API breakage for consumers: everything below is either
+internal, additive, or opt-in. None of it has been validated against physical hardware —
+the figures are round-trip counts, not measurements.
+
+### Fewer BLE commands per connection
+
+`getLockData()` already persisted `autoLockTime`, but `updateLockData()` never read it
+back, and the feature list, lock sound and static GATT values were not persisted at all.
+Every connection made after a process restart therefore re-queried them. `TTLockData`
+gains `featureList`, `lockSound`, `deviceCache` and `psPath`, all restored on load, taking
+`onConnected()` from five BLE commands to one — only the lock status, which is live state
+and is still confirmed over BLE on every connect.
+
+`lockedStatus` is deliberately **not** restored as truth: it is written out for external
+consumers, but the active status query remains responsible for it.
+
+`autoLockTime` and `lockSound` are configuration, so a change made from the official app
+while this SDK is down leaves the cache stale until `getAutolockTime(true)` /
+`getLockSound(true)` forces a re-read — the same contract the in-memory cache already had.
+
+`onConnected()` now emits `dataUpdated` when it discovers any of these, which nothing on
+the connect path did before.
+
+### Fewer GATT reads per connection
+
+`readBasicInfo()` read *every* readable characteristic of services 1800 and 180a to keep
+five values that never change. It now reads only those five, caches them in lock data, and
+issues no read at all once the cache is warm. `subscribe()` no longer reads service 1910's
+characteristics either — none of the values were used. On a cold cache the whole tree is
+pulled in one `discoverAll()` pass instead of a service discovery plus one characteristic
+discovery per service.
+
+`ServiceInterface.readCharacteristics()` takes an optional `uuids` argument to make this
+possible. Additive for callers; an external implementer of the interface would need to
+accept the parameter.
+
+### The lock/unlock challenge path is learned instead of guessed
+
+A lock answers exactly one of `COMM_CHECK_USER_TIME` and `COMM_CHECK_ADMIN`.
+`getPsFromLock()` always tried the user one first, so on an admin-paired lock every single
+`lock()`/`unlock()` paid a failing round-trip first. The working path is now remembered,
+persisted as `psPath`, and tried first, with the other kept as a fallback so a re-paired
+lock relearns on its own. `checkUserTime` also validates `ps > 0`, which it did not.
+
+### Polling loops replaced by event-driven waits
+
+Six `while (!flag) await sleep(n)` loops became callback- or event-driven, removing up to
+a full poll interval of latency after the outcome had already landed: adapter readiness
+(which slept 500 ms *before* its first check), connection completion (100 ms), command
+responses (5 ms), `waitForResponse` (100 ms), service discovery (10 ms) and characteristic
+writes (1 ms). New `waitForEvent()` helper in `util/timingUtil`, with `cancel()` so an
+abandoned wait does not hold listeners and a timer until timeout.
+
+`NobleDevice.discoverServices()` also surfaces the discovery error it used to swallow,
+instead of waiting out its full 10 s budget on a failure.
+
+### Shorter timeout on firmware-only commands
+
+`sendCommand()` accepts a `timeoutMs`. The challenge and status commands — answered from
+firmware with no physical work — use 4 s instead of 10 s, taking `macro_adminLogin`'s
+worst case from 30 s to 12 s across its three attempts. Commands that make the lock do
+physical work keep the 10 s default.
+
+### New — opt-in large MTU writes (`largeMtu`)
+
+Commands are written in 20-byte packets, the chunk size the official app uses. With
+`largeMtu: true` in `TTLockClient` settings, they use the negotiated ATT MTU instead,
+turning a typical 2-3 packet frame into one write. **Off by default**, because only
+20-byte chunking is known to work on every firmware; a lock that fails with it downgrades
+its link back to 20 bytes permanently after one failed command.
+
+Has no effect on the `noble-websocket` transport, which never negotiates an MTU.
+`NobleDevice.mtu` is now a getter reading the live negotiated value rather than a fixed
+field.
+
 ## [0.8.0]
 
 ### Breaking — `AudioManage` split into two enums

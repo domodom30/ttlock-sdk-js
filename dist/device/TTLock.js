@@ -138,17 +138,20 @@ class TTLock extends TTLockApi_1.TTLockApi {
         // clears `connecting`; otherwise it stays true and every later connect()
         // is permanently rejected by the guard above.
         try {
+            // Settled before device.connect() resolves: onConnected() runs on the
+            // device's 'connected' event and is not awaited by it, so the outcome can
+            // land while we are still setting up the wait.
+            const completed = (0, timingUtil_1.waitForEvent)(this, ['connected', 'disconnected'], timeout * 1000);
             const connected = await this.device.connect();
-            let timeoutCycles = timeout * 10;
             if (connected) {
                 log('Lock waiting for connection to be completed');
-                do {
-                    await (0, timingUtil_1.sleep)(100);
-                    timeoutCycles--;
-                } while (!this.connected && timeoutCycles > 0 && this.connecting);
+                // Resolves the moment onConnected finishes (or the lock drops), instead
+                // of on the next tick of a 100 ms poll.
+                await completed.promise;
             }
             else {
                 log('Lock connect failed');
+                completed.cancel();
             }
         }
         finally {
@@ -346,26 +349,60 @@ class TTLock extends TTLockApi_1.TTLockApi {
      * back to the "admin" path (checkAdmin only — the challenge is then
      * consumed directly by unlockCommand/lockCommand via setSum).
      */
+    /**
+     * Obtain a psFromLock for unlockCommand/lockCommand.
+     *
+     * A lock answers exactly one of the two challenge commands, so the other one
+     * always fails — a wasted BLE round-trip (plus its CRC retries) before every
+     * single lock()/unlock(). Which one works is a property of the lock, not of
+     * the moment, so the winner is remembered and persisted, and tried first from
+     * then on. The other one stays as a fallback: a lock that is re-paired, or
+     * whose admin credentials change, flips back on its own.
+     */
     async getPsFromLock() {
+        var _a;
+        const preferred = (_a = this.psPath) !== null && _a !== void 0 ? _a : 'user';
+        const fallback = preferred == 'user' ? 'admin' : 'user';
         try {
+            const ps = await this.challengeForPs(preferred);
+            this.setPsPath(preferred);
+            return ps;
+        }
+        catch (error) {
+            log(`========= ${preferred} challenge failed, falling back to ${fallback} path:`, error);
+            const ps = await this.challengeForPs(fallback);
+            this.setPsPath(fallback);
+            return ps;
+        }
+    }
+    /** Runs one challenge command, throwing if it does not yield a usable psFromLock. */
+    async challengeForPs(path) {
+        if (path == 'user') {
             log('========= check user time');
             const ps = await this.checkUserTime();
             log('========= check user time OK', ps);
-            return ps;
-        }
-        catch (userErr) {
-            log('========= check user time failed, falling back to admin path:', userErr);
-            // Admin path: checkAdmin only — the psFromLock is then passed to
-            // unlockCommand/lockCommand which sends setSum(ps, unlockKey).
-            // Do NOT call checkRandom here: it would consume the challenge and the
-            // next unlock command would be rejected by the lock.
-            log('========= check admin (admin path)');
-            const ps = await this.checkAdminCommand();
-            log('========= check admin OK:', ps);
             if (ps <= 0) {
-                throw new Error(`Invalid psFromLock from checkAdmin: ${ps}`);
+                throw new Error(`Invalid psFromLock from checkUserTime: ${ps}`);
             }
             return ps;
+        }
+        // Admin path: checkAdmin only — the psFromLock is then passed to
+        // unlockCommand/lockCommand which sends setSum(ps, unlockKey).
+        // Do NOT call checkRandom here: it would consume the challenge and the
+        // next unlock command would be rejected by the lock.
+        log('========= check admin (admin path)');
+        const ps = await this.checkAdminCommand();
+        log('========= check admin OK:', ps);
+        if (ps <= 0) {
+            throw new Error(`Invalid psFromLock from checkAdmin: ${ps}`);
+        }
+        return ps;
+    }
+    /** Remembers the working challenge path, persisting it when it changes. */
+    setPsPath(path) {
+        if (this.psPath != path) {
+            this.psPath = path;
+            this.emit('dataUpdated', this);
         }
     }
     /**
@@ -1704,6 +1741,14 @@ class TTLock extends TTLockApi_1.TTLockApi {
         }
     }
     async onConnected() {
+        // Values discovered below are cached in lockData so later connections can
+        // skip the BLE round-trips entirely. Without this signal they would be
+        // re-queried after every restart, since nothing else emits 'dataUpdated'
+        // on this path.
+        // Only consume the flag once there is somewhere to persist it: getLockData()
+        // returns nothing for an unpaired lock, so consuming it there would drop the
+        // cache for a lock paired later in this same session.
+        let dataChanged = this.isPaired() ? this.device.consumeFreshBasicInfo() : false;
         if (this.isPaired() && !this.skipDataRead) {
             // read general data
             log('Connected to known lock, reading general data');
@@ -1713,12 +1758,14 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     log('========= feature list');
                     this.featureList = await this.searchDeviceFeatureCommand();
                     log('========= feature list', this.featureList);
+                    dataChanged = true;
                 }
                 // Auto lock time
                 if (this.featureList.has(FeatureValue_1.FeatureValue.AUTO_LOCK) && this.autoLockTime == -1 && (await this.macro_adminLogin())) {
                     log('========= autoLockTime');
                     this.autoLockTime = await this.searchAutoLockTimeCommand();
                     log('========= autoLockTime:', this.autoLockTime);
+                    dataChanged = true;
                 }
                 if (this.lockedStatus == LockedStatus_1.LockedStatus.UNKNOWN || this.statusUnverified) {
                     // Locked/unlocked status
@@ -1738,6 +1785,7 @@ class TTLock extends TTLockApi_1.TTLockApi {
                     log('========= lockSound');
                     this.lockSound = await this.audioManageCommand();
                     log('========= lockSound:', this.lockSound);
+                    dataChanged = true;
                 }
             }
             catch (error) {
@@ -1752,6 +1800,11 @@ class TTLock extends TTLockApi_1.TTLockApi {
             else {
                 this.lockedStatus = LockedStatus_1.LockedStatus.LOCKED;
             }
+        }
+        // Emit before 'connected' so a consumer that persists on 'dataUpdated' has
+        // the cache written by the time it starts issuing commands.
+        if (dataChanged) {
+            this.emit('dataUpdated', this);
         }
         // are we still connected ? It is possible the lock will disconnect while reading general data
         if (this.device.connected) {
@@ -1789,7 +1842,11 @@ class TTLock extends TTLockApi_1.TTLockApi {
                 lockedStatus: this.lockedStatus,
                 privateData: privateData,
                 operationLog: this.operationLog,
-                missingSequences: Array.from(this.missingSequences)
+                missingSequences: Array.from(this.missingSequences),
+                featureList: this.featureList ? Array.from(this.featureList) : undefined,
+                lockSound: this.lockSound,
+                deviceCache: this.device.getBasicInfoCache(),
+                psPath: this.psPath
             };
             return data;
         }

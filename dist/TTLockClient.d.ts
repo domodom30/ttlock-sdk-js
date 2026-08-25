@@ -8,6 +8,17 @@ export interface Settings {
     scannerType?: ScannerType;
     scannerOptions?: ScannerOptions;
     lockData?: TTLockData[];
+    /**
+     * Write commands in packets as large as the negotiated ATT MTU allows, instead
+     * of the classic 20 bytes. Saves one or two BLE connection intervals per
+     * command on locks that accept it — but the official app only ever writes 20
+     * bytes, so not every firmware is known to. Off by default; a lock that fails
+     * with it falls back to 20 bytes on its own after one failed command.
+     *
+     * Has no effect on the 'noble-websocket' transport, which never negotiates an
+     * MTU and so always stays at 20.
+     */
+    largeMtu?: boolean;
 }
 export interface TTLockClient {
     on(event: "ready", listener: () => void): this;
@@ -25,6 +36,7 @@ export declare class TTLockClient extends events.EventEmitter implements TTLockC
     scannerOptions: ScannerOptions;
     lockData: Map<string, TTLockData>;
     private adapterReady;
+    private readonly largeMtu;
     private readonly lockDevices;
     private scanning;
     private monitoring;

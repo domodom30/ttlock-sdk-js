@@ -9,6 +9,8 @@ const Lock_1 = require("./constant/Lock");
 const TTLock_1 = require("./device/TTLock");
 const BluetoothLeService_1 = require("./scanner/BluetoothLeService");
 const timingUtil_1 = require("./util/timingUtil");
+/** How long prepareBTService() waits for the adapter to report itself ready. */
+const ADAPTER_READY_TIMEOUT_MS = 2500;
 class TTLockClient extends node_events_1.default.EventEmitter {
     constructor(options) {
         super();
@@ -18,6 +20,7 @@ class TTLockClient extends node_events_1.default.EventEmitter {
         this.scanning = false;
         this.monitoring = false;
         this.adapterReady = false;
+        this.largeMtu = options.largeMtu === true;
         if (options.uuids) {
             this.uuids = options.uuids;
         }
@@ -45,15 +48,21 @@ class TTLockClient extends node_events_1.default.EventEmitter {
                 this.adapterReady = true;
                 this.emit("ready");
             });
+            // Settle on the 'ready' event rather than polling. Armed after the handler
+            // above so `adapterReady` is already set when this resolves; the old loop
+            // slept 500 ms *before* its first check, so every startup paid that half
+            // second even when the adapter was ready right away.
+            const ready = (0, timingUtil_1.waitForEvent)(this.bleService, ["ready"], ADAPTER_READY_TIMEOUT_MS);
             this.bleService.on("scanStart", this.onScanStart.bind(this));
             this.bleService.on("scanStop", this.onScanStop.bind(this));
             this.bleService.on("discover", this.onScanResult.bind(this));
             // wait for adapter to become ready
-            let counter = 5;
-            do {
-                await (0, timingUtil_1.sleep)(500);
-                counter--;
-            } while (counter > 0 && !this.adapterReady);
+            if (this.adapterReady) {
+                ready.cancel();
+            }
+            else {
+                await ready.promise;
+            }
             return this.adapterReady;
         }
         return true;
@@ -169,6 +178,7 @@ class TTLockClient extends node_events_1.default.EventEmitter {
         if (device.lockType != Lock_1.LockType.UNKNOWN) {
             if (!this.lockDevices.has(device.address)) {
                 const data = this.lockData.get(device.address);
+                device.setLargeMtuEnabled(this.largeMtu);
                 const lock = new TTLock_1.TTLock(device, data);
                 this.lockDevices.set(device.address, lock);
                 lock.on("dataUpdated", (lock) => {

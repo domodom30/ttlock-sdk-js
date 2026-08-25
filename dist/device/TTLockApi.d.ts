@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { KeyboardPwdType, TTLockData } from '..';
+import { TTLockPsPath } from '../store/TTLockData';
 import { AudioManage } from '../constant/AudioManage';
 import { ConfigRemoteUnlock } from '../constant/ConfigRemoteUnlock';
 import { FeatureValue } from '../constant/FeatureValue';
@@ -75,6 +76,11 @@ export declare abstract class TTLockApi extends EventEmitter {
      * status query, so we flag it here instead of assuming LOCKED.
      */
     protected statusUnverified: boolean;
+    /**
+     * The challenge command that actually works on this lock. Undefined until the
+     * first lock()/unlock() finds out. @see TTLockPsPath
+     */
+    protected psPath?: TTLockPsPath;
     protected operationLog: LogEntry[];
     /**
      * Sequences the firmware answered with its "no record" sentinel. The operation log is

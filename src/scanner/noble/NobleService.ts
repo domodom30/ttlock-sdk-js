@@ -68,14 +68,24 @@ export class NobleService implements ServiceInterface {
     }
   }
 
-  async readCharacteristics(): Promise<Map<string, CharacteristicInterface>> {
+  /**
+   * Read characteristic values, one blocking ATT round-trip each. Pass `uuids`
+   * (short form) to read only those characteristics; requested UUIDs that the
+   * service does not expose are simply skipped.
+   */
+  async readCharacteristics(uuids?: string[]): Promise<Map<string, CharacteristicInterface>> {
     if (this.characteristics.size == 0) {
       await this.discoverCharacteristics();
     }
 
+    const wanted = uuids !== undefined ? new Set(uuids) : undefined;
+
     for (let [uuid, characteristic] of this.characteristics) {
       if (!this.device.connected) {
         break;
+      }
+      if (wanted !== undefined && !wanted.has(uuid)) {
+        continue;
       }
       try {
         await characteristic.read();

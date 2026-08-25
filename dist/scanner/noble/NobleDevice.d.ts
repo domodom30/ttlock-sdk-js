@@ -12,12 +12,19 @@ export declare class NobleDevice extends EventEmitter implements DeviceInterface
     connecting: boolean;
     connected: boolean;
     rssi: number;
-    mtu: number;
     manufacturerData: Buffer;
     services: Map<string, NobleService>;
     busy: boolean;
     private peripheral;
     constructor(peripheral: Peripheral);
+    /**
+     * The ATT MTU actually negotiated for this link, or the 23-byte BLE default
+     * when none was. Read live rather than cached at connect time: noble's MTU
+     * exchange can complete after the connect callback has already fired, and
+     * transports that never negotiate (the websocket binding) leave it null
+     * forever.
+     */
+    get mtu(): number;
     updateFromPeripheral(): void;
     checkBusy(): boolean;
     resetBusy(): boolean;

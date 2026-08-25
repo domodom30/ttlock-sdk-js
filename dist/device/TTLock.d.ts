@@ -89,7 +89,21 @@ export declare class TTLock extends TTLockApi implements TTLock {
      * back to the "admin" path (checkAdmin only — the challenge is then
      * consumed directly by unlockCommand/lockCommand via setSum).
      */
+    /**
+     * Obtain a psFromLock for unlockCommand/lockCommand.
+     *
+     * A lock answers exactly one of the two challenge commands, so the other one
+     * always fails — a wasted BLE round-trip (plus its CRC retries) before every
+     * single lock()/unlock(). Which one works is a property of the lock, not of
+     * the moment, so the winner is remembered and persisted, and tried first from
+     * then on. The other one stays as a fallback: a lock that is re-paired, or
+     * whose admin credentials change, flips back on its own.
+     */
     private getPsFromLock;
+    /** Runs one challenge command, throwing if it does not yield a usable psFromLock. */
+    private challengeForPs;
+    /** Remembers the working challenge path, persisting it when it changes. */
+    private setPsPath;
     /**
      * Lock the lock
      */

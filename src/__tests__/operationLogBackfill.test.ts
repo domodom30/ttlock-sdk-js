@@ -115,7 +115,10 @@ describe('getOperationLog backfill bounds', () => {
       admin: { adminPs: 1, unlockKey: 2 },
       adminPasscode: '1234'
     };
-    (harness.lock as any).device = { address: 'AA:BB:CC:DD:EE:FF' };
+    (harness.lock as any).device = {
+      address: 'AA:BB:CC:DD:EE:FF',
+      getBasicInfoCache: () => undefined
+    };
     (harness.lock as any).isPaired = () => true;
 
     await harness.lock.getOperationLog(true, false, { maxProbeEmpty: 2 });

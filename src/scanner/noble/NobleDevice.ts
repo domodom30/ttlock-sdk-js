@@ -4,10 +4,15 @@ import { DeviceInterface, ServiceInterface } from "../DeviceInterface";
 import { Peripheral, Service } from "@abandonware/noble";
 import { EventEmitter } from "events";
 import { NobleService } from "./NobleService";
-import { sleep } from "../../util/timingUtil";
 import { createLogger } from "../../util/logger";
 
 const log = createLogger("ttlock:scanner");
+
+/** Matches the 10 s ceiling the previous 10 ms-poll loop enforced. */
+const DISCOVER_SERVICES_TIMEOUT_MS = 10000;
+
+/** The ATT MTU every BLE link starts at, before any exchange. */
+const DEFAULT_ATT_MTU = 23;
 
 export class NobleDevice extends EventEmitter implements DeviceInterface {
   id: string;
@@ -19,7 +24,6 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
   connecting: boolean = false;
   connected: boolean = false;
   rssi: number;
-  mtu: number = 20;
   manufacturerData: Buffer;
   services: Map<string, NobleService>;
   busy: boolean = false;
@@ -44,6 +48,18 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
     this.peripheral.on("connect", this.onConnect.bind(this));
     this.peripheral.on("disconnect", this.onDisconnect.bind(this));
     this.services = new Map();
+  }
+
+  /**
+   * The ATT MTU actually negotiated for this link, or the 23-byte BLE default
+   * when none was. Read live rather than cached at connect time: noble's MTU
+   * exchange can complete after the connect callback has already fired, and
+   * transports that never negotiate (the websocket binding) leave it null
+   * forever.
+   */
+  get mtu(): number {
+    const negotiated = this.peripheral.mtu;
+    return typeof negotiated == "number" && negotiated > 0 ? negotiated : DEFAULT_ATT_MTU;
   }
 
   updateFromPeripheral() {
@@ -181,16 +197,31 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
         this.resetBusy();
         throw new Error("NobleDevice not connected");
       }
-      let timeoutCycles = 10 * 100;
-      let services: Service[] = [];
       this.services = new Map();
-      this.peripheral.discoverServices([], (error, discoveredServices) => {
-        services = discoveredServices;
+      // Settle on the discovery callback rather than polling every 10 ms. The
+      // old loop also swallowed the error argument entirely and simply waited
+      // out its 10 s budget on a failed discovery.
+      const services = await new Promise<Service[]>((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          log("Peripheral discoverServices timeout");
+          resolve([]);
+        }, DISCOVER_SERVICES_TIMEOUT_MS);
+
+        this.peripheral.discoverServices([], (error, discoveredServices) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (error !== undefined && error != null) {
+            log.error("Peripheral discoverServices error:", error);
+            resolve([]);
+          } else {
+            resolve(discoveredServices ?? []);
+          }
+        });
       });
-      do {
-        await sleep(10);
-        timeoutCycles--;
-      } while (services.length == 0 && timeoutCycles > 0 && this.connected);
 
       this.resetBusy();
       if (!this.connected) {
