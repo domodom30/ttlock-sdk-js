@@ -14,7 +14,12 @@ export declare class NobleService implements ServiceInterface {
     getUUID(): string;
     dispose(): void;
     discoverCharacteristics(): Promise<Map<string, CharacteristicInterface>>;
-    readCharacteristics(): Promise<Map<string, CharacteristicInterface>>;
+    /**
+     * Read characteristic values, one blocking ATT round-trip each. Pass `uuids`
+     * (short form) to read only those characteristics; requested UUIDs that the
+     * service does not expose are simply skipped.
+     */
+    readCharacteristics(uuids?: string[]): Promise<Map<string, CharacteristicInterface>>;
     toJSON(asObject: boolean): string | Object;
     toString(): string;
 }

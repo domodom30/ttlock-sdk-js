@@ -12,13 +12,27 @@ import {
 } from "./scanner/BluetoothLeService";
 import { ScannerOptions } from "./scanner/ScannerInterface";
 import { TTLockData } from "./store/TTLockData";
-import { sleep } from "./util/timingUtil";
+import { waitForEvent } from "./util/timingUtil";
+
+/** How long prepareBTService() waits for the adapter to report itself ready. */
+const ADAPTER_READY_TIMEOUT_MS = 2500;
 
 export interface Settings {
   uuids?: string[];
   scannerType?: ScannerType;
   scannerOptions?: ScannerOptions;
   lockData?: TTLockData[];
+  /**
+   * Write commands in packets as large as the negotiated ATT MTU allows, instead
+   * of the classic 20 bytes. Saves one or two BLE connection intervals per
+   * command on locks that accept it — but the official app only ever writes 20
+   * bytes, so not every firmware is known to. Off by default; a lock that fails
+   * with it falls back to 20 bytes on its own after one failed command.
+   *
+   * Has no effect on the 'noble-websocket' transport, which never negotiates an
+   * MTU and so always stays at 20.
+   */
+  largeMtu?: boolean;
 }
 
 export interface TTLockClient {
@@ -38,6 +52,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
   scannerOptions: ScannerOptions;
   lockData: Map<string, TTLockData>;
   private adapterReady: boolean;
+  private readonly largeMtu: boolean;
   private readonly lockDevices: Map<string, TTLock> = new Map();
   private scanning: boolean = false;
   private monitoring: boolean = false;
@@ -46,6 +61,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
     super();
 
     this.adapterReady = false;
+    this.largeMtu = options.largeMtu === true;
 
     if (options.uuids) {
       this.uuids = options.uuids;
@@ -80,16 +96,21 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
         this.adapterReady = true;
         this.emit("ready");
       });
+      // Settle on the 'ready' event rather than polling. Armed after the handler
+      // above so `adapterReady` is already set when this resolves; the old loop
+      // slept 500 ms *before* its first check, so every startup paid that half
+      // second even when the adapter was ready right away.
+      const ready = waitForEvent(this.bleService, ["ready"], ADAPTER_READY_TIMEOUT_MS);
       this.bleService.on("scanStart", this.onScanStart.bind(this));
       this.bleService.on("scanStop", this.onScanStop.bind(this));
       this.bleService.on("discover", this.onScanResult.bind(this));
 
       // wait for adapter to become ready
-      let counter = 5;
-      do {
-        await sleep(500);
-        counter--;
-      } while (counter > 0 && !this.adapterReady);
+      if (this.adapterReady) {
+        ready.cancel();
+      } else {
+        await ready.promise;
+      }
       return this.adapterReady;
     }
     return true;
@@ -211,6 +232,7 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
     if (device.lockType != LockType.UNKNOWN) {
       if (!this.lockDevices.has(device.address)) {
         const data = this.lockData.get(device.address);
+        device.setLargeMtuEnabled(this.largeMtu);
         const lock = new TTLock(device, data);
         this.lockDevices.set(device.address, lock);
         lock.on("dataUpdated", (lock) => {

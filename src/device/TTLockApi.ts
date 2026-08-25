@@ -2,6 +2,7 @@
 
 import { EventEmitter } from 'events';
 import { CommandEnvelope, KeyboardPwdType, TTLockData } from '..';
+import { TTLockPsPath } from '../store/TTLockData';
 import { AudioManage } from '../constant/AudioManage';
 import { CommandResponse } from '../constant/CommandResponse';
 import { describeFirmwareError } from '../constant/FirmwareErrorCode';
@@ -59,6 +60,15 @@ import { CodeSecret } from '../api/Commands/InitPasswordsCommand';
 import { DeviceInfoEnum } from '../constant/DeviceInfoEnum';
 import { ICOperate } from '../constant/ICOperate';
 import { LockedStatus } from '../constant/LockedStatus';
+
+/**
+ * Response timeout for the challenge and status commands: the lock answers these
+ * from firmware alone, with no physical work involved, so a slow answer means a
+ * lost frame rather than a busy lock. The default 10 s only shows up as dead
+ * waiting time — three times over in macro_adminLogin's retry loop, right on the
+ * path a user is waiting on.
+ */
+const FAST_RESPONSE_TIMEOUT_MS = 4000;
 
 export interface PassageModeResponse {
   sequence: number;
@@ -157,6 +167,11 @@ export abstract class TTLockApi extends EventEmitter {
    * status query, so we flag it here instead of assuming LOCKED.
    */
   protected statusUnverified: boolean = false;
+  /**
+   * The challenge command that actually works on this lock. Undefined until the
+   * first lock()/unlock() finds out. @see TTLockPsPath
+   */
+  protected psPath?: TTLockPsPath;
   protected operationLog: LogEntry[];
   /**
    * Sequences the firmware answered with its "no record" sentinel. The operation log is
@@ -234,6 +249,28 @@ export abstract class TTLockApi extends EventEmitter {
     if (data.missingSequences !== undefined) {
       this.missingSequences = new Set(data.missingSequences);
     }
+    // Restore the values onConnected would otherwise re-query over BLE on every
+    // connection following a restart. These are configuration, not state: they
+    // only change when someone changes them. If that happened from the official
+    // app while this SDK was down, the cache is stale until a caller forces a
+    // re-read (getAutolockTime(true) / getLockSound(true)).
+    //
+    // lockedStatus is deliberately NOT restored: it is live state, and
+    // onConnected must confirm it over BLE regardless.
+    if (data.featureList !== undefined && data.featureList.length > 0) {
+      this.featureList = new Set(data.featureList as FeatureValue[]);
+    }
+    if (data.autoLockTime !== undefined && data.autoLockTime >= 0) {
+      this.autoLockTime = data.autoLockTime;
+    }
+    // Validate rather than cast: persisted JSON is outside our control.
+    if (data.lockSound === AudioManage.TURN_ON || data.lockSound === AudioManage.TURN_OFF) {
+      this.lockSound = data.lockSound;
+    }
+    if (data.psPath === 'user' || data.psPath === 'admin') {
+      this.psPath = data.psPath;
+    }
+    this.device.setBasicInfoCache(data.deviceCache);
     this.initialized = true;
   }
 
@@ -814,7 +851,7 @@ export abstract class TTLockApi extends EventEmitter {
     requestEnvelope.setCommandType(CommandType.COMM_CHECK_ADMIN);
     let cmd = requestEnvelope.getCommand() as CheckAdminCommand;
     cmd.setParams(this.privateData.admin.adminPs);
-    const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
       cmd = responseEnvelope.getCommand() as CheckAdminCommand;
@@ -842,7 +879,7 @@ export abstract class TTLockApi extends EventEmitter {
     requestEnvelope.setCommandType(CommandType.COMM_CHECK_RANDOM);
     let cmd = requestEnvelope.getCommand() as CheckRandomCommand;
     cmd.setSum(psFromLock, this.privateData.admin.unlockKey);
-    const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
       cmd = responseEnvelope.getCommand() as CheckRandomCommand;
@@ -884,7 +921,7 @@ export abstract class TTLockApi extends EventEmitter {
     requestEnvelope.setCommandType(CommandType.COMM_CHECK_USER_TIME);
     let cmd = requestEnvelope.getCommand() as CheckUserTimeCommand;
     cmd.setPayload(0, startDate, endDate, 0);
-    const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
       cmd = responseEnvelope.getCommand() as CheckUserTimeCommand;
@@ -1076,7 +1113,7 @@ export abstract class TTLockApi extends EventEmitter {
     }
     const requestEnvelope = CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
     requestEnvelope.setCommandType(CommandType.COMM_SEARCH_BICYCLE_STATUS);
-    const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+    const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
     if (responseEnvelope) {
       responseEnvelope.setAesKey(aesKey);
       const cmd = responseEnvelope.getCommand() as SearchBicycleStatusCommand;

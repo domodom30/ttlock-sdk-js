@@ -4,6 +4,7 @@ import { CommandEnvelope } from "../api/CommandEnvelope";
 import { LockType, LockVersion } from "../constant/Lock";
 import { CharacteristicInterface, DeviceInterface, ServiceInterface } from "../scanner/DeviceInterface";
 import { ScannerInterface } from "../scanner/ScannerInterface";
+import { TTLockDeviceCache } from "../store/TTLockData";
 import { createLogger } from "../util/logger";
 import { sleep } from "../util/timingUtil";
 import { TTDevice } from "./TTDevice";
@@ -11,7 +12,24 @@ import { TTDevice } from "./TTDevice";
 const CRLF = "0d0a";
 const MTU = 20;
 const RESPONSE_TIMEOUT_MS = 10000;
-const RESPONSE_POLL_INTERVAL_MS = 5;
+
+/**
+ * Generic Access (1800) and Device Information (180a) characteristics whose
+ * values this SDK actually uses, mapped to the TTDevice property they populate.
+ * Reading anything else from those services is a wasted ATT round-trip.
+ */
+const BASIC_INFO_CHARACTERISTICS: { service: string; values: Record<string, keyof TTLockDeviceCache> }[] = [
+  { service: "1800", values: { "2a00": "name" } },
+  {
+    service: "180a",
+    values: {
+      "2a29": "manufacturer",
+      "2a24": "model",
+      "2a27": "hardware",
+      "2a26": "firmware"
+    }
+  }
+];
 
 const log = createLogger("ttlock:ble");
 const commLog = createLogger("ttlock:comm");
@@ -31,6 +49,22 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   private waitingForResponse: boolean = false;
   private responses: CommandEnvelope[] = [];
   private malformedResponse: Error | null = null;
+  /**
+   * Static GATT values already known for this lock, from a previous connection
+   * or restored from persisted lock data. When set, `readBasicInfo()` applies
+   * them instead of issuing the reads.
+   */
+  private basicInfoCache?: TTLockDeviceCache;
+  /** Set when the cache was just filled by real GATT reads, so it is worth persisting. */
+  private basicInfoCacheFresh: boolean = false;
+  /**
+   * Wakes a pending response wait the instant one of its three outcomes lands —
+   * a parsed response, a malformed frame, or a disconnect — so the wait does not
+   * have to poll for them.
+   */
+  private responseSignal?: () => void;
+  /** @see setLargeMtuEnabled */
+  private largeMtu: boolean = false;
 
   private constructor(scanner: ScannerInterface) {
     super();
@@ -127,36 +161,118 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     }
     this.responses = [];
     this.incomingDataBuffer = Buffer.from([]);
+    this.signalResponse();
     this.emit("disconnected");
   }
 
+  /** Releases a pending response wait, if there is one. */
+  private signalResponse(): void {
+    const signal = this.responseSignal;
+    this.responseSignal = undefined;
+    if (signal !== undefined) {
+      signal();
+    }
+  }
+
+  /**
+   * Resolves once a response, a malformed frame or a disconnect lands, or after
+   * `timeoutMs`. Callers re-inspect the state themselves — this only says
+   * "something happened, look again".
+   */
+  private awaitResponseSignal(timeoutMs: number, settled: () => boolean): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        this.responseSignal = undefined;
+        resolve();
+      }, timeoutMs);
+      this.responseSignal = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      // The outcome can land between sending and arming this, in which case no
+      // further signal is ever coming.
+      if (settled()) {
+        this.signalResponse();
+      }
+    });
+  }
+
+  /**
+   * Seed the static GATT values from persisted lock data so the next connection
+   * can skip reading them. Ignored if it carries no usable value.
+   */
+  setBasicInfoCache(cache?: TTLockDeviceCache): void {
+    if (cache !== undefined && Object.values(cache).some((value) => typeof value == "string" && value != "")) {
+      this.basicInfoCache = cache;
+    }
+  }
+
+  /** The static GATT values known for this lock, for persisting. */
+  getBasicInfoCache(): TTLockDeviceCache | undefined {
+    return this.basicInfoCache;
+  }
+
+  /**
+   * True once, after the cache has been filled by actual GATT reads — the signal
+   * that it is newly worth writing out. Clears on read.
+   */
+  consumeFreshBasicInfo(): boolean {
+    const fresh = this.basicInfoCacheFresh;
+    this.basicInfoCacheFresh = false;
+    return fresh;
+  }
+
   private async readBasicInfo() {
-    if (this.device !== undefined) {
+    if (this.device === undefined) {
+      return;
+    }
+    // A warm cache spares one blocking ATT round-trip per value, every single
+    // connection: these are burned into the lock and never change. Only service
+    // 1910 is still needed then (subscribe() looks it up here), so discovering
+    // its characteristics alone beats sweeping every service.
+    if (this.basicInfoCache !== undefined) {
       log("BLE Device discover services start");
       await this.device.discoverServices();
       log("BLE Device discover services end");
-      // update some basic information
-      let service: ServiceInterface | undefined;
-      if (this.device.services.has("1800")) {
-        service = this.device.services.get("1800");
-        if (service !== undefined) {
-          log("BLE Device read characteristics start");
-          await service.readCharacteristics();
-          log("BLE Device read characteristics end");
-          this.putCharacteristicValue(service, "2a00", "name");
+      log("BLE Device using cached basic info");
+      this.applyBasicInfoCache(this.basicInfoCache);
+      return;
+    }
+
+    // Cold cache: characteristics are needed across three services, so pull the
+    // whole tree in one pass instead of a service discovery followed by a
+    // separate characteristic discovery per service.
+    log("BLE Device discover all start");
+    await this.device.discoverAll();
+    log("BLE Device discover all end");
+
+    // update some basic information
+    const cache: TTLockDeviceCache = {};
+    for (const { service: serviceUuid, values } of BASIC_INFO_CHARACTERISTICS) {
+      const service = this.device.services.get(serviceUuid);
+      if (service === undefined) {
+        continue;
+      }
+      log("BLE Device read characteristics start");
+      // Only the characteristics whose values are used below - reading the rest
+      // of the service costs an extra round-trip each for nothing.
+      await service.readCharacteristics(Object.keys(values));
+      log("BLE Device read characteristics end");
+      for (const [uuid, property] of Object.entries(values)) {
+        const value = this.putCharacteristicValue(service, uuid, property);
+        if (value !== undefined) {
+          cache[property] = value;
         }
       }
-      if (this.device.services.has("180a")) {
-        service = this.device.services.get("180a");
-        if (service !== undefined) {
-          log("BLE Device read characteristics start");
-          await service.readCharacteristics();
-          log("BLE Device read characteristics end");
-          this.putCharacteristicValue(service, "2a29", "manufacturer");
-          this.putCharacteristicValue(service, "2a24", "model");
-          this.putCharacteristicValue(service, "2a27", "hardware");
-          this.putCharacteristicValue(service, "2a26", "firmware");
-        }
+    }
+    this.setBasicInfoCache(cache);
+    this.basicInfoCacheFresh = this.basicInfoCache === cache;
+  }
+
+  private applyBasicInfoCache(cache: TTLockDeviceCache): void {
+    for (const [property, value] of Object.entries(cache)) {
+      if (typeof value == "string" && value != "") {
+        Reflect.set(this, property, value);
       }
     }
   }
@@ -168,7 +284,11 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
         service = this.device.services.get("1910");
       }
       if (service !== undefined) {
-        await service.readCharacteristics();
+        // Discovery only: none of this service's readable characteristics are
+        // used, so reading them just burns a round-trip each.
+        if (service.characteristics.size == 0) {
+          await service.discoverCharacteristics();
+        }
         if (service.characteristics.has("fff4")) {
           const characteristic = service.characteristics.get("fff4");
           if (characteristic !== undefined) {
@@ -190,7 +310,18 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     return false;
   }
 
-  async sendCommand(command: CommandEnvelope, waitForResponse: boolean = true, ignoreCrc: boolean = false): Promise<CommandEnvelope | void> {
+  /**
+   * @param timeoutMs How long to wait for each response attempt. The default is
+   * generous because some commands make the lock do physical work; callers that
+   * know their command is answered from firmware alone should pass a shorter
+   * one, so a silent lock is detected in seconds rather than tens of seconds.
+   */
+  async sendCommand(
+    command: CommandEnvelope,
+    waitForResponse: boolean = true,
+    ignoreCrc: boolean = false,
+    timeoutMs: number = RESPONSE_TIMEOUT_MS
+  ): Promise<CommandEnvelope | void> {
     if (this.waitingForResponse) {
       throw new Error("Command already in progress");
     }
@@ -229,17 +360,10 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
                   throw new Error("Unable to send data to lock");
                 }
                 // wait for a response with a hard timeout to avoid hanging forever
-                const maxCycles = Math.ceil(RESPONSE_TIMEOUT_MS / RESPONSE_POLL_INTERVAL_MS);
-                let cycles = 0;
-                while (
-                  this.responses.length == 0 &&
-                  this.connected &&
-                  this.malformedResponse === null &&
-                  cycles < maxCycles
-                ) {
-                  cycles++;
-                  await sleep(RESPONSE_POLL_INTERVAL_MS);
-                }
+                await this.awaitResponseSignal(
+                  timeoutMs,
+                  () => this.responses.length > 0 || !this.connected || this.malformedResponse !== null
+                );
                 if (!this.connected) {
                   this.responses = [];
                   throw new Error("Disconnected while waiting for response");
@@ -273,8 +397,21 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
                 }
               }
               return response;
+            } catch (error) {
+              // A command that failed while writing in large packets is the only
+              // evidence we get that this firmware wants the classic 20-byte
+              // chunking. Downgrade the link permanently and let the caller
+              // retry; keeping it on would fail every command from here on.
+              if (this.largeMtu && this.writeChunkSize > MTU) {
+                log.warn("Command failed with large MTU writes, falling back to " + MTU + " byte chunks", error);
+                this.largeMtu = false;
+              }
+              throw error;
             } finally {
               this.waitingForResponse = false;
+              // Drop any waiter left behind by a throw, so a later signal can't
+              // resolve a wait nobody is holding any more.
+              this.responseSignal = undefined;
             }
           } else {
             await this.writeCharacteristic(characteristic, data);
@@ -296,13 +433,17 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     this.waitingForResponse = true;
 
     log("Waiting for response");
-    let cycles = 0;
-    const sleepPerCycle = 100;
-    while (this.responses.length == 0 && cycles * sleepPerCycle < timeout) {
-      cycles++;
-      await sleep(sleepPerCycle);
+    const started = Date.now();
+    try {
+      // Used for the commands that wait on a physical action (present a card,
+      // scan a finger), so the timeout is long. Event-driven rather than polled,
+      // it also returns straight away when the lock drops the link instead of
+      // sitting out the full timeout.
+      await this.awaitResponseSignal(timeout, () => this.responses.length > 0 || !this.connected);
+    } finally {
+      this.responseSignal = undefined;
     }
-    log("Waited for a response for", cycles, "=", cycles * sleepPerCycle, "ms");
+    log("Waited for a response for", Date.now() - started, "ms");
 
     if (this.responses.length > 0) {
       response = this.responses.pop();
@@ -311,19 +452,46 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     return response;
   }
 
+  /**
+   * Enable writing commands in packets larger than the classic 20 bytes, when
+   * the link negotiated an ATT MTU that allows it.
+   *
+   * Off by default and deliberately so: the official TTLock app always writes in
+   * 20-byte chunks, so that is the only chunking every firmware is known to
+   * accept. When enabled, a first failed command downgrades this link back to 20
+   * bytes for good (see `sendCommand`), so a lock that dislikes it costs one
+   * retry rather than staying broken.
+   */
+  setLargeMtuEnabled(enabled: boolean): void {
+    this.largeMtu = enabled;
+  }
+
+  /**
+   * How many bytes to put in one write. ATT spends 3 bytes of the MTU on the
+   * write header, and anything at or below the classic chunk stays at 20.
+   */
+  private get writeChunkSize(): number {
+    if (!this.largeMtu) {
+      return MTU;
+    }
+    const usable = (this.device?.mtu ?? 0) - 3;
+    return usable > MTU ? usable : MTU;
+  }
+
   private async writeCharacteristic(characteristic: CharacteristicInterface, data: Buffer): Promise<boolean> {
     if (commLog.enabled) {
       commLog("Sending command:", data.toString("hex"));
     }
+    const chunkSize = this.writeChunkSize;
     let index = 0;
     do {
       const remaining = data.length - index;
-      const written = await characteristic.write(data.subarray(index, index + Math.min(MTU, remaining)), true);
+      const written = await characteristic.write(data.subarray(index, index + Math.min(chunkSize, remaining)), true);
       if (!written) {
         return false;
       }
       // await sleep(10);
-      index += MTU;
+      index += chunkSize;
     } while (index < data.length);
     return true;
   }
@@ -346,6 +514,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
           const command = CommandEnvelope.createFromRawData(this.incomingDataBuffer.subarray(0, this.incomingDataBuffer.length - 2));
           if (this.waitingForResponse) {
             this.responses.push(command);
+            this.signalResponse();
           } else {
             // discard unsolicited messages if CRC is not ok
             if (command.isCrcOk()) {
@@ -357,6 +526,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
           const wrapped = error instanceof Error ? error : new Error(String(error));
           if (this.waitingForResponse) {
             this.malformedResponse = wrapped;
+            this.signalResponse();
           } else {
             log.error("Malformed unsolicited response", error);
           }
@@ -366,11 +536,15 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     }
   }
 
-  private putCharacteristicValue(service: ServiceInterface, uuid: string, property: string) {
+  /** Copies a read characteristic onto this device, returning what was set. */
+  private putCharacteristicValue(service: ServiceInterface, uuid: string, property: string): string | undefined {
     const value = service.characteristics.get(uuid);
     if (value !== undefined && value.lastValue !== undefined) {
-      Reflect.set(this, property, value.lastValue.toString());
+      const text = value.lastValue.toString();
+      Reflect.set(this, property, text);
+      return text;
     }
+    return undefined;
   }
 
   async disconnect() {

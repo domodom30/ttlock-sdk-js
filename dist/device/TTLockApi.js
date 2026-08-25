@@ -16,6 +16,14 @@ const PassageModeOperate_1 = require("../constant/PassageModeOperate");
 const DeviceInfoEnum_1 = require("../constant/DeviceInfoEnum");
 const ICOperate_1 = require("../constant/ICOperate");
 const LockedStatus_1 = require("../constant/LockedStatus");
+/**
+ * Response timeout for the challenge and status commands: the lock answers these
+ * from firmware alone, with no physical work involved, so a slow answer means a
+ * lost frame rather than a busy lock. The default 10 s only shows up as dead
+ * waiting time — three times over in macro_adminLogin's retry loop, right on the
+ * path a user is waiting on.
+ */
+const FAST_RESPONSE_TIMEOUT_MS = 4000;
 // Thrown when the lock answers an operation log request with FAILED + commandData=0x01,
 // which the firmware uses as a "no record at this sequence" sentinel rather than a real
 // protocol error. Callers should skip the sequence instead of retrying.
@@ -120,6 +128,28 @@ class TTLockApi extends events_1.EventEmitter {
         if (data.missingSequences !== undefined) {
             this.missingSequences = new Set(data.missingSequences);
         }
+        // Restore the values onConnected would otherwise re-query over BLE on every
+        // connection following a restart. These are configuration, not state: they
+        // only change when someone changes them. If that happened from the official
+        // app while this SDK was down, the cache is stale until a caller forces a
+        // re-read (getAutolockTime(true) / getLockSound(true)).
+        //
+        // lockedStatus is deliberately NOT restored: it is live state, and
+        // onConnected must confirm it over BLE regardless.
+        if (data.featureList !== undefined && data.featureList.length > 0) {
+            this.featureList = new Set(data.featureList);
+        }
+        if (data.autoLockTime !== undefined && data.autoLockTime >= 0) {
+            this.autoLockTime = data.autoLockTime;
+        }
+        // Validate rather than cast: persisted JSON is outside our control.
+        if (data.lockSound === AudioManage_1.AudioManage.TURN_ON || data.lockSound === AudioManage_1.AudioManage.TURN_OFF) {
+            this.lockSound = data.lockSound;
+        }
+        if (data.psPath === 'user' || data.psPath === 'admin') {
+            this.psPath = data.psPath;
+        }
+        this.device.setBasicInfoCache(data.deviceCache);
         this.initialized = true;
     }
     /**
@@ -725,7 +755,7 @@ class TTLockApi extends events_1.EventEmitter {
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_CHECK_ADMIN);
         let cmd = requestEnvelope.getCommand();
         cmd.setParams(this.privateData.admin.adminPs);
-        const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+        const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
         if (responseEnvelope) {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
@@ -754,7 +784,7 @@ class TTLockApi extends events_1.EventEmitter {
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_CHECK_RANDOM);
         let cmd = requestEnvelope.getCommand();
         cmd.setSum(psFromLock, this.privateData.admin.unlockKey);
-        const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+        const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
         if (responseEnvelope) {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
@@ -798,7 +828,7 @@ class TTLockApi extends events_1.EventEmitter {
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_CHECK_USER_TIME);
         let cmd = requestEnvelope.getCommand();
         cmd.setPayload(0, startDate, endDate, 0);
-        const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+        const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
         if (responseEnvelope) {
             responseEnvelope.setAesKey(aesKey);
             cmd = responseEnvelope.getCommand();
@@ -998,7 +1028,7 @@ class TTLockApi extends events_1.EventEmitter {
         }
         const requestEnvelope = __1.CommandEnvelope.createFromLockType(this.device.lockType, aesKey);
         requestEnvelope.setCommandType(CommandType_1.CommandType.COMM_SEARCH_BICYCLE_STATUS);
-        const responseEnvelope = await this.device.sendCommand(requestEnvelope);
+        const responseEnvelope = await this.device.sendCommand(requestEnvelope, true, false, FAST_RESPONSE_TIMEOUT_MS);
         if (responseEnvelope) {
             responseEnvelope.setAesKey(aesKey);
             const cmd = responseEnvelope.getCommand();

@@ -36,7 +36,13 @@ export interface ServiceInterface {
   characteristics: Map<string, CharacteristicInterface>;
   getUUID(): string;
   discoverCharacteristics(): Promise<Map<string, CharacteristicInterface>>;
-  readCharacteristics(): Promise<Map<string, CharacteristicInterface>>;
+  /**
+   * Read characteristic values. Each read is a separate ATT round-trip, so pass
+   * `uuids` (short form, as returned by `CharacteristicInterface.getUUID()`) to
+   * read only what is actually needed. Omitting it reads every readable
+   * characteristic of the service.
+   */
+  readCharacteristics(uuids?: string[]): Promise<Map<string, CharacteristicInterface>>;
   toJSON(asObject: boolean): string | Object;
   toString(): string;
 }

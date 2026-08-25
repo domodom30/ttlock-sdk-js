@@ -2,13 +2,15 @@
 
 import { Characteristic } from "@abandonware/noble";
 import { EventEmitter } from "events";
-import { sleep } from "../../util/timingUtil";
 import {
   CharacteristicInterface,
   DescriptorInterface,
 } from "../DeviceInterface";
 import { NobleDescriptor } from "./NobleDescriptor";
 import { NobleDevice } from "./NobleDevice";
+
+/** Matches the 5 s ceiling the previous 1 ms-poll loop enforced. */
+const WRITE_TIMEOUT_MS = 5000;
 
 export class NobleCharacteristic
   extends EventEmitter
@@ -109,23 +111,28 @@ export class NobleCharacteristic
       // throw new Error("NobleDevice is not connected");
     }
 
-    let written = false;
-    let writeError = false;
-    let counter = 5000;
+    // Settle on the write callback instead of polling a flag every 1 ms: a write
+    // completes in well under a millisecond of CPU time, so the old loop mostly
+    // burned timers while the packet was in flight, and delayed each of the
+    // (up to three) packets of a command by up to a tick.
+    const written = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve(false);
+      }, WRITE_TIMEOUT_MS);
 
-    this.characteristic.write(data, withoutResponse, (error) => {
-      if (error) {
-        writeError = true;
-      }
-      written = true;
+      this.characteristic.write(data, withoutResponse, (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(!error);
+      });
     });
-    do {
-      await sleep(1);
-      counter--;
-    } while (!written && counter > 0);
 
     this.device.resetBusy();
-    return written && !writeError;
+    return written;
   }
 
   async subscribe(): Promise<void> {
