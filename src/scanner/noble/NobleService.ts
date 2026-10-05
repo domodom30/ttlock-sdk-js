@@ -5,8 +5,12 @@ import { CharacteristicInterface, ServiceInterface } from "../DeviceInterface";
 import { NobleCharacteristic } from "./NobleCharacteristic";
 import { NobleDevice } from "./NobleDevice";
 import { createLogger } from "../../util/logger";
+import { withTimeout } from "../../util/timingUtil";
 
 const log = createLogger("ttlock:scanner");
+
+/** Noble never fails characteristic discovery on a dropped link — bound it. */
+const DISCOVER_CHARACTERISTICS_TIMEOUT_MS = 5000;
 
 export class NobleService implements ServiceInterface {
   uuid: string;
@@ -54,7 +58,11 @@ export class NobleService implements ServiceInterface {
     try {
       this.characteristics = new Map();
       this.device.checkBusy();
-      const characteristics = await this.service.discoverCharacteristicsAsync();
+      const characteristics = await withTimeout(
+        this.service.discoverCharacteristicsAsync(),
+        DISCOVER_CHARACTERISTICS_TIMEOUT_MS,
+        "Service discoverCharacteristics"
+      );
       this.device.resetBusy();
       characteristics.forEach((characteristic) => {
         const c = new NobleCharacteristic(this.device, characteristic);

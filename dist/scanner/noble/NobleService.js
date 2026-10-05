@@ -3,7 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NobleService = void 0;
 const NobleCharacteristic_1 = require("./NobleCharacteristic");
 const logger_1 = require("../../util/logger");
+const timingUtil_1 = require("../../util/timingUtil");
 const log = (0, logger_1.createLogger)("ttlock:scanner");
+/** Noble never fails characteristic discovery on a dropped link — bound it. */
+const DISCOVER_CHARACTERISTICS_TIMEOUT_MS = 5000;
 class NobleService {
     constructor(device, service) {
         this.characteristics = new Map();
@@ -37,7 +40,7 @@ class NobleService {
         try {
             this.characteristics = new Map();
             this.device.checkBusy();
-            const characteristics = await this.service.discoverCharacteristicsAsync();
+            const characteristics = await (0, timingUtil_1.withTimeout)(this.service.discoverCharacteristicsAsync(), DISCOVER_CHARACTERISTICS_TIMEOUT_MS, "Service discoverCharacteristics");
             this.device.resetBusy();
             characteristics.forEach((characteristic) => {
                 const c = new NobleCharacteristic_1.NobleCharacteristic(this.device, characteristic);

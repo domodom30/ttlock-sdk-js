@@ -113,7 +113,8 @@ export class TTLockClient extends events.EventEmitter implements TTLockClient {
       }
       return this.adapterReady;
     }
-    return true;
+    // A second call after a timed-out first one must not claim a readiness never reached.
+    return this.adapterReady;
   }
 
   stopBTService(): boolean {

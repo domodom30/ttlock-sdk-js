@@ -3,8 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NobleCharacteristic = void 0;
 const events_1 = require("events");
 const NobleDescriptor_1 = require("./NobleDescriptor");
+const timingUtil_1 = require("../../util/timingUtil");
 /** Matches the 5 s ceiling the previous 1 ms-poll loop enforced. */
 const WRITE_TIMEOUT_MS = 5000;
+/**
+ * Bound for the GATT exchanges noble never fails on a dropped link (read, subscribe,
+ * descriptor discovery): without it a disconnect mid-exchange hung connect() for good.
+ */
+const GATT_OP_TIMEOUT_MS = 5000;
 class NobleCharacteristic extends events_1.EventEmitter {
     constructor(device, characteristic) {
         super();
@@ -40,7 +46,7 @@ class NobleCharacteristic extends events_1.EventEmitter {
             throw new Error("NobleDevice is not connected");
         }
         try {
-            const descriptors = await this.characteristic.discoverDescriptorsAsync();
+            const descriptors = await (0, timingUtil_1.withTimeout)(this.characteristic.discoverDescriptorsAsync(), GATT_OP_TIMEOUT_MS, "Characteristic discoverDescriptors");
             this.descriptors = new Map();
             descriptors.forEach((descriptor) => {
                 this.descriptors.set(descriptor.uuid, new NobleDescriptor_1.NobleDescriptor(this.device, descriptor));
@@ -63,7 +69,7 @@ class NobleCharacteristic extends events_1.EventEmitter {
         }
         this.isReading = true;
         try {
-            this.lastValue = await this.characteristic.readAsync();
+            this.lastValue = await (0, timingUtil_1.withTimeout)(this.characteristic.readAsync(), GATT_OP_TIMEOUT_MS, "Characteristic read");
         }
         catch (error) {
             console.error(error);
@@ -107,7 +113,7 @@ class NobleCharacteristic extends events_1.EventEmitter {
         return written;
     }
     async subscribe() {
-        await this.characteristic.subscribeAsync();
+        await (0, timingUtil_1.withTimeout)(this.characteristic.subscribeAsync(), GATT_OP_TIMEOUT_MS, "Characteristic subscribe");
     }
     onRead(data) {
         if (!this.isReading) {

@@ -18,3 +18,13 @@ export interface EventWait {
  * listeners (and its timer) until the timeout, piling up across retries.
  */
 export declare function waitForEvent(emitter: EventEmitter, events: string[], timeoutMs: number): EventWait;
+/**
+ * Reject with `Error("<label> timed out after <ms> ms")` if `promise` has not settled
+ * within `timeoutMs`. The timer is always cleared.
+ *
+ * Noble's *Async helpers wait for an event that never comes when the link drops in the
+ * middle of a GATT exchange (no error callback), so every one of them must be bounded:
+ * an unbounded await there wedges the whole connect/disconnect state machine.
+ * The wrapped operation itself is not cancelled — callers must clean up on rejection.
+ */
+export declare function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T>;

@@ -16,6 +16,8 @@ export declare class NobleDevice extends EventEmitter implements DeviceInterface
     services: Map<string, NobleService>;
     busy: boolean;
     private peripheral;
+    /** Set when disconnect() timed out and tore the link down without noble's event. */
+    private tornDownLocally;
     constructor(peripheral: Peripheral);
     /**
      * The ATT MTU actually negotiated for this link, or the 23-byte BLE default

@@ -31,6 +31,8 @@ export declare class TTLock extends TTLockApi implements TTLock {
     private connected;
     private skipDataRead;
     private connecting;
+    /** Set when connect() ran out of budget, so a late onConnected() tears the session down. */
+    private connectAborted;
     private autoLockTimer?;
     lastPasscodeError: PasscodeOperationError | null;
     constructor(device: TTBluetoothDevice, data?: TTLockData);
@@ -67,6 +69,13 @@ export declare class TTLock extends TTLockApi implements TTLock {
      * Requires FeatureValue.UNLOCK_DIRECTION in the lock feature list.
      */
     setUnlockDirection(direction: UnlockDirection): Promise<boolean>;
+    /**
+     * @param timeout Overall budget in seconds, covering the BLE link, GATT setup and the
+     * post-connect data reads. Past it the attempt is abandoned *and torn down*: before,
+     * the BLE setup itself was unbounded (connect() could hang forever with `connecting`
+     * stuck) and a late onConnected() still completed afterwards, leaving an open session
+     * nobody owned — the lock stopped advertising until it dropped the link itself.
+     */
     connect(skipDataRead?: boolean, timeout?: number): Promise<boolean>;
     isConnected(): boolean;
     disconnect(): Promise<void>;
@@ -115,7 +124,21 @@ export declare class TTLock extends TTLockApi implements TTLock {
     /**
      * Get the status of the lock (locked or unlocked)
      */
+    /**
+     * Get the status of the lock (locked or unlocked)
+     *
+     * @param noCache Force a live query. In that mode a failed query throws instead of
+     * returning the cached value: callers that ask for a live read must be able to tell a
+     * fresh result from a stale one.
+     */
     getLockStatus(noCache?: boolean): Promise<LockedStatus>;
+    /**
+     * Adopt a status read from the lock. Only 0/1 are real answers: anything else (short
+     * frame → -1, unexpected value) used to be stored as verified and then reported as
+     * "unlocked" by the LOCKED ? 'locked' : 'unlocked' emit.
+     */
+    private applyQueriedStatus;
+    private emitStatusChange;
     getAutolockTime(noCache?: boolean): Promise<number>;
     /**
      * Synchronizes the lock's clock with the current system time.

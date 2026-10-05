@@ -65,7 +65,8 @@ class TTLockClient extends node_events_1.default.EventEmitter {
             }
             return this.adapterReady;
         }
-        return true;
+        // A second call after a timed-out first one must not claim a readiness never reached.
+        return this.adapterReady;
     }
     stopBTService() {
         if (this.bleService != null) {

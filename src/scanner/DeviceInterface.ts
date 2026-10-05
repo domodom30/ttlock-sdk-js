@@ -9,6 +9,8 @@ export interface DeviceInterface extends EventEmitter {
   address: string;
   addressType: string;
   connectable: boolean;
+  /** Live link state, when the implementation tracks it. */
+  connected?: boolean;
   rssi: number;
   mtu: number;
   manufacturerData: Buffer;

@@ -24,6 +24,23 @@ const LockedStatus_1 = require("../constant/LockedStatus");
  * path a user is waiting on.
  */
 const FAST_RESPONSE_TIMEOUT_MS = 4000;
+/**
+ * Advertised battery rises larger than this many points are held back until confirmed.
+ * Some firmwares advertise a bogus 100 for ~1-2 s right after a BLE session ends (same
+ * frame, only the battery byte differs: 0x64 instead of the real 0x57), which made the
+ * battery sensor jump 87 → 100 → 87. A genuine rise of that size only happens when the
+ * batteries are replaced, so it can afford a short confirmation delay; drops and small
+ * fluctuations (87 ↔ 88) are still applied immediately.
+ */
+const BATTERY_RISE_THRESHOLD = 5;
+/**
+ * How long after a confirmed lock() the advertised "unlocked" bit is ignored. The bit stays
+ * set for a short while after any unlock, so a lock issued right after an unlock was
+ * followed by an advertisement flipping the state back to UNLOCKED (LOCK → UNLOCK → LOCK
+ * flicker, and unlock automations fired for nothing).
+ */
+const STALE_UNLOCK_BIT_MS = 20 * 1000;
+const BATTERY_RISE_CONFIRM_MS = 60 * 1000;
 // Thrown when the lock answers an operation log request with FAILED + commandData=0x01,
 // which the firmware uses as a "no record at this sequence" sentinel rather than a real
 // protocol error. Callers should skip the sequence instead of retrying.
@@ -63,6 +80,8 @@ class TTLockApi extends events_1.EventEmitter {
          * status query, so we flag it here instead of assuming LOCKED.
          */
         this.statusUnverified = false;
+        /** When lock() last succeeded. @see STALE_UNLOCK_BIT_MS */
+        this.confirmedLockAt = 0;
         this.device = device;
         this.privateData = {};
         if (this.device.isUnlock) {
@@ -87,16 +106,22 @@ class TTLockApi extends events_1.EventEmitter {
         }
     }
     updateFromTTDevice() {
+        const batteryCapacity = this.filterAdvertisedBattery(this.device.batteryCapacity);
         let paramsChanged = {
-            batteryCapacity: this.batteryCapacity != this.device.batteryCapacity,
+            batteryCapacity: this.batteryCapacity != batteryCapacity,
             newEvents: this.device.hasEvents && this.newEvents != this.device.hasEvents,
             lockedStatus: false
         };
-        this.batteryCapacity = this.device.batteryCapacity;
+        this.batteryCapacity = batteryCapacity;
         this.rssi = this.device.rssi;
         this.initialized = !this.device.isSettingMode;
         this.newEvents = this.device.hasEvents;
-        if (this.device.isUnlock) {
+        if (this.device.isUnlock &&
+            this.lockedStatus == LockedStatus_1.LockedStatus.LOCKED &&
+            Date.now() - this.confirmedLockAt < STALE_UNLOCK_BIT_MS) {
+            // Leftover bit from the unlock that preceded our confirmed lock() — not a new unlock.
+        }
+        else if (this.device.isUnlock) {
             paramsChanged.lockedStatus = this.lockedStatus != LockedStatus_1.LockedStatus.UNLOCKED;
             this.lockedStatus = LockedStatus_1.LockedStatus.UNLOCKED;
             this.statusUnverified = false;
@@ -113,6 +138,31 @@ class TTLockApi extends events_1.EventEmitter {
             log('Emmiting paramsChanged', paramsChanged);
             this.emit('updated', this, paramsChanged);
         }
+    }
+    /**
+     * Returns the battery level to adopt from an advertisement: the advertised value, except
+     * for a rise above BATTERY_RISE_THRESHOLD, which keeps the current value until the rise
+     * has been advertised for BATTERY_RISE_CONFIRM_MS. Any advertisement back within the
+     * threshold cancels the pending rise.
+     */
+    filterAdvertisedBattery(advertised) {
+        const current = this.batteryCapacity;
+        if (current < 0 || advertised < 0 || advertised - current <= BATTERY_RISE_THRESHOLD) {
+            this.pendingBatteryRise = undefined;
+            return advertised;
+        }
+        const now = Date.now();
+        if (!this.pendingBatteryRise) {
+            this.pendingBatteryRise = { since: now };
+            log.warn(`Advertised battery rise ${current} → ${advertised} held back pending confirmation`);
+            return current;
+        }
+        if (now - this.pendingBatteryRise.since >= BATTERY_RISE_CONFIRM_MS) {
+            this.pendingBatteryRise = undefined;
+            log.warn(`Advertised battery rise ${current} → ${advertised} confirmed`);
+            return advertised;
+        }
+        return current;
     }
     updateLockData(data) {
         const privateData = data.privateData;
@@ -866,8 +916,12 @@ class TTLockApi extends events_1.EventEmitter {
                 // its presence proves the unlock was performed (the COMM_UNLOCK ack is
                 // frequently CRC-corrupted or superseded). Accept it instead of a false
                 // negative that triggers pointless re-actuating retries.
+                // Unless that status explicitly says LOCKED: then the unlock did not happen.
                 if (responseEnvelope.getCommandType() == CommandType_1.CommandType.COMM_SEARCH_BICYCLE_STATUS) {
-                    return {};
+                    const statusCmd = responseEnvelope.getCommand();
+                    if (statusCmd.getLockStatus() != LockedStatus_1.LockedStatus.LOCKED) {
+                        return {};
+                    }
                 }
                 throw new Error('Failed unlock response');
             }

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sleep = sleep;
 exports.waitForEvent = waitForEvent;
+exports.withTimeout = withTimeout;
 function sleep(ms) {
     return new Promise((resolve) => {
         setTimeout(resolve, ms);
@@ -46,4 +47,20 @@ function waitForEvent(emitter, events, timeoutMs) {
         }
     });
     return { promise, cancel };
+}
+/**
+ * Reject with `Error("<label> timed out after <ms> ms")` if `promise` has not settled
+ * within `timeoutMs`. The timer is always cleared.
+ *
+ * Noble's *Async helpers wait for an event that never comes when the link drops in the
+ * middle of a GATT exchange (no error callback), so every one of them must be bounded:
+ * an unbounded await there wedges the whole connect/disconnect state machine.
+ * The wrapped operation itself is not cancelled — callers must clean up on rejection.
+ */
+function withTimeout(promise, timeoutMs, label) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(label + " timed out after " + timeoutMs + " ms")), timeoutMs);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

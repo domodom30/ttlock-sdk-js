@@ -21,6 +21,7 @@ function makeBtDevice(mtu: number | undefined): any {
   btDevice.connected = true;
   btDevice.waitingForResponse = false;
   btDevice.responses = [];
+  btDevice.incomingDataBuffer = Buffer.from([]);
   btDevice.malformedResponse = null;
   btDevice.responseSignal = undefined;
   btDevice.device = { mtu, services: new Map() };

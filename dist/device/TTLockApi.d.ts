@@ -76,6 +76,10 @@ export declare abstract class TTLockApi extends EventEmitter {
      * status query, so we flag it here instead of assuming LOCKED.
      */
     protected statusUnverified: boolean;
+    /** When lock() last succeeded. @see STALE_UNLOCK_BIT_MS */
+    protected confirmedLockAt: number;
+    /** Advertised battery rise awaiting confirmation. @see BATTERY_RISE_THRESHOLD */
+    private pendingBatteryRise?;
     /**
      * The challenge command that actually works on this lock. Undefined until the
      * first lock()/unlock() finds out. @see TTLockPsPath
@@ -91,6 +95,13 @@ export declare abstract class TTLockApi extends EventEmitter {
     protected privateData: PrivateDataType;
     constructor(device: TTBluetoothDevice, data?: TTLockData);
     updateFromTTDevice(): void;
+    /**
+     * Returns the battery level to adopt from an advertisement: the advertised value, except
+     * for a rise above BATTERY_RISE_THRESHOLD, which keeps the current value until the rise
+     * has been advertised for BATTERY_RISE_CONFIRM_MS. Any advertisement back within the
+     * threshold cancels the pending rise.
+     */
+    private filterAdvertisedBattery;
     updateLockData(data: TTLockData): void;
     /**
      * Send init command

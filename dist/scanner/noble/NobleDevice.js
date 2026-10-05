@@ -4,9 +4,22 @@ exports.NobleDevice = void 0;
 const events_1 = require("events");
 const NobleService_1 = require("./NobleService");
 const logger_1 = require("../../util/logger");
+const timingUtil_1 = require("../../util/timingUtil");
 const log = (0, logger_1.createLogger)("ttlock:scanner");
 /** Matches the 10 s ceiling the previous 10 ms-poll loop enforced. */
 const DISCOVER_SERVICES_TIMEOUT_MS = 10000;
+/**
+ * Upper bound for discoverAllServicesAndCharacteristics. Noble never fails it when the
+ * link drops mid-discovery (it just waits for the next GATT event), which used to wedge
+ * TTLock.connect() forever with `connecting` stuck at true.
+ */
+const DISCOVER_ALL_TIMEOUT_MS = 10000;
+/**
+ * Upper bound for disconnectAsync. Noble resolves it on the 'disconnect' event, which a
+ * dead HCI adapter or a gateway that lost the link may never deliver; past this delay the
+ * link is torn down locally (onDisconnect) so the next connect is not refused.
+ */
+const DISCONNECT_TIMEOUT_MS = 3000;
 /** The ATT MTU every BLE link starts at, before any exchange. */
 const DEFAULT_ATT_MTU = 23;
 class NobleDevice extends events_1.EventEmitter {
@@ -15,6 +28,8 @@ class NobleDevice extends events_1.EventEmitter {
         this.connecting = false;
         this.connected = false;
         this.busy = false;
+        /** Set when disconnect() timed out and tore the link down without noble's event. */
+        this.tornDownLocally = false;
         this.peripheral = peripheral;
         this.id = peripheral.id;
         this.uuid = peripheral.uuid;
@@ -73,7 +88,16 @@ class NobleDevice extends events_1.EventEmitter {
         return this.busy;
     }
     async connect(timeout = 10) {
-        if (!this.connectable || this.connected || this.connecting) {
+        if (this.connected && this.peripheral.state != "connected") {
+            // The 'disconnect' event was lost (adapter reset, gateway link drop, timed-out
+            // disconnect): without this, every later connect was refused for good.
+            log("Stale connected flag (peripheral state: " + this.peripheral.state + ") — resetting");
+            this.onDisconnect("stale");
+        }
+        if (this.connected) {
+            return true;
+        }
+        if (!this.connectable || this.connecting) {
             log("Peripheral state:", this.peripheral.state);
             return false;
         }
@@ -82,6 +106,7 @@ class NobleDevice extends events_1.EventEmitter {
             return true;
         }
         this.connecting = true;
+        this.tornDownLocally = false;
         log("Peripheral connect start");
         // Settle on the native connect callback (success or error) rather than
         // polling: this resolves as soon as the outcome is known, and clearing the
@@ -98,7 +123,11 @@ class NobleDevice extends events_1.EventEmitter {
                 try {
                     this.peripheral.cancelConnect();
                 }
-                catch (error) { /* swallow */ }
+                catch (error) {
+                    // Must not prevent resolve(false), but a binding that cannot cancel leaves its own
+                    // connect state behind — keep that visible.
+                    log("Peripheral cancelConnect failed:", error);
+                }
                 resolve(false);
             }, timeout * 1000);
             this.peripheral.connect((error) => {
@@ -128,14 +157,20 @@ class NobleDevice extends events_1.EventEmitter {
         return true;
     }
     async disconnect() {
-        if (this.connectable && this.connected) {
+        if (this.connectable && (this.connected || this.connecting)) {
             try {
-                await this.peripheral.disconnectAsync();
+                await (0, timingUtil_1.withTimeout)(this.peripheral.disconnectAsync(), DISCONNECT_TIMEOUT_MS, "Peripheral disconnect");
                 return true;
             }
             catch (error) {
                 log.error(error);
-                return false;
+                // Tear the link down locally either way: a disconnect that never reports back
+                // must not leave `connected` set (see connect()).
+                if (this.connected || this.connecting) {
+                    this.onDisconnect("disconnect failed");
+                    this.tornDownLocally = true;
+                }
+                return true;
             }
         }
         return false;
@@ -150,7 +185,7 @@ class NobleDevice extends events_1.EventEmitter {
                 this.resetBusy();
                 throw new Error("NobleDevice not connected");
             }
-            const snc = await this.peripheral.discoverAllServicesAndCharacteristicsAsync();
+            const snc = await (0, timingUtil_1.withTimeout)(this.peripheral.discoverAllServicesAndCharacteristicsAsync(), DISCOVER_ALL_TIMEOUT_MS, "Peripheral discoverAll");
             this.resetBusy();
             this.services = new Map();
             snc.services.forEach((service) => {
@@ -253,6 +288,14 @@ class NobleDevice extends events_1.EventEmitter {
         log("Peripheral connect triggered");
     }
     onDisconnect(error) {
+        if (this.tornDownLocally) {
+            // Already torn down by a timed-out disconnect(); swallow the late noble event so
+            // consumers do not see the same disconnect twice.
+            this.tornDownLocally = false;
+            if (!this.connected && !this.connecting) {
+                return;
+            }
+        }
         this.connected = false;
         this.connecting = false;
         this.resetBusy();
