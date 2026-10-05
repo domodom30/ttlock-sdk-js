@@ -78,7 +78,10 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   }
 
   updateFromDevice(device?: DeviceInterface): void {
-    if (device !== undefined) {
+    // Rebind only when the underlying device object actually changes: this runs on every
+    // advertisement (dozens per second with duplicates allowed), and tearing down and
+    // re-adding the listeners each time also removed listeners registered by others.
+    if (device !== undefined && device !== this.device) {
       if (this.device !== undefined) {
         this.device.removeAllListeners();
       }
@@ -127,6 +130,11 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
         log("BLE Device subscribed");
         if (!subscribed) {
           await this.device.disconnect();
+          return false;
+        } else if (this.device.connected === false) {
+          // The link dropped while subscribing: its disconnect event has already been
+          // handled, so claiming `connected` here would never be corrected.
+          log("Disconnected while subscribing");
           return false;
         } else {
           this.connected = true;
@@ -325,9 +333,16 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     if (this.waitingForResponse) {
       throw new Error("Command already in progress");
     }
-    if (this.responses.length > 0) {
-      // should this be an error ?
-      throw new Error("Unprocessed responses");
+    if (!this.connected) {
+      throw new Error("Lock is not connected");
+    }
+    if (this.responses.length > 0 || this.incomingDataBuffer.length > 0) {
+      // Leftovers of a previous exchange (a late reply after a timeout, an extra status
+      // frame). Throwing here, as before, failed every later command of the session.
+      log.warn("Discarding " + this.responses.length + " unprocessed response(s) and "
+        + this.incomingDataBuffer.length + " buffered byte(s) before sending");
+      this.responses = [];
+      this.incomingDataBuffer = Buffer.from([]);
     }
     const commandData = command.buildCommandBuffer();
     if (commandData) {
@@ -337,86 +352,89 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       ]);
       // write with 20 bytes MTU
       const service = this.device?.services.get("1910");
-      if (service !== undefined) {
-        const characteristic = service?.characteristics.get("fff2");
-        if (characteristic !== undefined) {
-          if (waitForResponse) {
-            let retry = 0;
-            let crcs: number[] = [];
-            let response: CommandEnvelope | undefined;
-            this.waitingForResponse = true;
-            this.malformedResponse = null;
-            try {
-              do {
-                if (retry > 0) {
-                  // wait a bit before retry
-                  await sleep(200);
-                }
-                const written = await this.writeCharacteristic(characteristic, data);
-                if (!written) {
-                  // make sure we clear response buffer as a response could still have been
-                  // received between writing packets (before lock disconnects, on unstable network)
-                  this.responses = [];
-                  throw new Error("Unable to send data to lock");
-                }
-                // wait for a response with a hard timeout to avoid hanging forever
-                await this.awaitResponseSignal(
-                  timeoutMs,
-                  () => this.responses.length > 0 || !this.connected || this.malformedResponse !== null
-                );
-                if (!this.connected) {
-                  this.responses = [];
-                  throw new Error("Disconnected while waiting for response");
-                }
-                const malformed = this.malformedResponse as Error | null;
-                if (malformed !== null) {
-                  this.malformedResponse = null;
-                  this.responses = [];
-                  throw new Error("Malformed response: " + malformed.message);
-                }
-                if (this.responses.length == 0) {
-                  this.responses = [];
-                  throw new Error("Timeout waiting for response");
-                }
-                response = this.responses.pop();
-                if (response !== undefined) {
-                  crcs.push(response.getCrc());
-                }
-                retry++;
-              } while (response === undefined || (!response.isCrcOk() && !ignoreCrc && retry <= 2));
-              if (!response.isCrcOk() && !ignoreCrc) {
-                // check if all CRCs match and auto-ignore bad CRC
-                if (crcs.length > 1) {
-                  for (let i = 1; i < crcs.length; i++) {
-                    if (crcs[i - 1] != crcs[i]) {
-                      throw new Error("Malformed response, bad CRC");
-                    }
-                  }
-                } else {
+      const characteristic = service?.characteristics.get("fff2");
+      if (characteristic === undefined) {
+        // Services are cleared on disconnect: returning nothing here looked like a
+        // command that merely went unanswered.
+        throw new Error("Lock is not connected (write characteristic missing)");
+      }
+      if (waitForResponse) {
+        let retry = 0;
+        let crcs: number[] = [];
+        let response: CommandEnvelope | undefined;
+        this.waitingForResponse = true;
+        this.malformedResponse = null;
+        try {
+          do {
+            if (retry > 0) {
+              // wait a bit before retry
+              await sleep(200);
+            }
+            const written = await this.writeCharacteristic(characteristic, data);
+            if (!written) {
+              // make sure we clear response buffer as a response could still have been
+              // received between writing packets (before lock disconnects, on unstable network)
+              this.responses = [];
+              throw new Error("Unable to send data to lock");
+            }
+            // wait for a response with a hard timeout to avoid hanging forever
+            await this.awaitResponseSignal(
+              timeoutMs,
+              () => this.responses.length > 0 || !this.connected || this.malformedResponse !== null
+            );
+            if (!this.connected) {
+              this.responses = [];
+              throw new Error("Disconnected while waiting for response");
+            }
+            const malformed = this.malformedResponse as Error | null;
+            if (malformed !== null) {
+              this.malformedResponse = null;
+              this.responses = [];
+              throw new Error("Malformed response: " + malformed.message);
+            }
+            if (this.responses.length == 0) {
+              this.responses = [];
+              throw new Error("Timeout waiting for response");
+            }
+            response = this.responses.pop();
+            if (response !== undefined) {
+              crcs.push(response.getCrc());
+            }
+            retry++;
+          } while (response === undefined || (!response.isCrcOk() && !ignoreCrc && retry <= 2));
+          if (!response.isCrcOk() && !ignoreCrc) {
+            // check if all CRCs match and auto-ignore bad CRC
+            if (crcs.length > 1) {
+              for (let i = 1; i < crcs.length; i++) {
+                if (crcs[i - 1] != crcs[i]) {
                   throw new Error("Malformed response, bad CRC");
                 }
               }
-              return response;
-            } catch (error) {
-              // A command that failed while writing in large packets is the only
-              // evidence we get that this firmware wants the classic 20-byte
-              // chunking. Downgrade the link permanently and let the caller
-              // retry; keeping it on would fail every command from here on.
-              if (this.largeMtu && this.writeChunkSize > MTU) {
-                log.warn("Command failed with large MTU writes, falling back to " + MTU + " byte chunks", error);
-                this.largeMtu = false;
-              }
-              throw error;
-            } finally {
-              this.waitingForResponse = false;
-              // Drop any waiter left behind by a throw, so a later signal can't
-              // resolve a wait nobody is holding any more.
-              this.responseSignal = undefined;
+            } else {
+              throw new Error("Malformed response, bad CRC");
             }
-          } else {
-            await this.writeCharacteristic(characteristic, data);
           }
+          return response;
+        } catch (error) {
+          // A command that failed while writing in large packets is the only
+          // evidence we get that this firmware wants the classic 20-byte
+          // chunking. Downgrade the link permanently and let the caller
+          // retry; keeping it on would fail every command from here on.
+          if (this.largeMtu && this.writeChunkSize > MTU) {
+            log.warn("Command failed with large MTU writes, falling back to " + MTU + " byte chunks", error);
+            this.largeMtu = false;
+          }
+          throw error;
+        } finally {
+          this.waitingForResponse = false;
+          // Drop any waiter left behind by a throw, so a later signal can't
+          // resolve a wait nobody is holding any more.
+          this.responseSignal = undefined;
+          // A second frame of the same exchange must not leak into the next command.
+          this.responses = [];
         }
+      } else {
+        await this.writeCharacteristic(characteristic, data);
       }
     }
   }
@@ -439,17 +457,22 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
       // scan a finger), so the timeout is long. Event-driven rather than polled,
       // it also returns straight away when the lock drops the link instead of
       // sitting out the full timeout.
-      await this.awaitResponseSignal(timeout, () => this.responses.length > 0 || !this.connected);
+      await this.awaitResponseSignal(
+        timeout,
+        () => this.responses.length > 0 || !this.connected || this.malformedResponse !== null
+      );
+      log("Waited for a response for", Date.now() - started, "ms");
+
+      if (this.responses.length > 0) {
+        response = this.responses.pop();
+      }
+      return response;
     } finally {
       this.responseSignal = undefined;
+      this.malformedResponse = null;
+      this.responses = [];
+      this.waitingForResponse = false;
     }
-    log("Waited for a response for", Date.now() - started, "ms");
-
-    if (this.responses.length > 0) {
-      response = this.responses.pop();
-    }
-    this.waitingForResponse = false;
-    return response;
   }
 
   /**
@@ -548,7 +571,10 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   }
 
   async disconnect() {
-    if (await this.device?.disconnect()) {
+    await this.device?.disconnect();
+    // NobleDevice.disconnect() tears the link down locally when noble does not answer; a
+    // failed or refused disconnect must not leave this flag set either.
+    if (this.device === undefined || this.device.connected !== true) {
       this.connected = false;
     }
   }
@@ -654,6 +680,7 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
     }
     offset++;
 
+    // Raw advertised value; transient bogus rises are filtered in TTLockApi.updateFromTTDevice.
     this.batteryCapacity = manufacturerData.readInt8(offset);
 
     // offset += 3 + 4; // Offset in original SDK is + 3, but in scans it's actually +4

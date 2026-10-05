@@ -5,8 +5,17 @@ import nobleObj from "@abandonware/noble";
 import { EventEmitter } from "events";
 import { NobleDevice } from "./NobleDevice";
 import { createLogger } from "../../util/logger";
+import { withTimeout } from "../../util/timingUtil";
 
 const log = createLogger("ttlock:scanner");
+
+/**
+ * Bound for noble's start/stopScanningAsync, which wait for a scanStart/scanStop event the
+ * controller may never send (e.g. scan enable rejected while LE Create Connection is
+ * pending). Unbounded, scannerState stayed "starting"/"stopping" and every later
+ * startScan()/stopScan() returned false: monitoring was dead until restart.
+ */
+const SCAN_COMMAND_TIMEOUT_MS = 5000;
 
 type nobleStateType =
   | "unknown"
@@ -26,6 +35,8 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   private readonly onStateChangeBound = this.onNobleStateChange.bind(this);
   private readonly onScanStartBound = this.onNobleScanStart.bind(this);
   private readonly onScanStopBound = this.onNobleScanStop.bind(this);
+  /** In-flight start, so a stop requested meanwhile can wait for it instead of no-op'ing. */
+  private startPromise?: Promise<boolean>;
 
   constructor(uuids: string[] = []) {
     super();
@@ -66,7 +77,12 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
       if (this.nobleState == "poweredOn") {
         this.scannerState = "starting";
 
-        return await this.startNobleScan(passive);
+        this.startPromise = this.startNobleScan(passive);
+        try {
+          return await this.startPromise;
+        } finally {
+          this.startPromise = undefined;
+        }
       } else {
         return false;
       }
@@ -75,6 +91,11 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   }
 
   async stopScan(): Promise<boolean> {
+    if (this.scannerState == "starting" && this.startPromise !== undefined) {
+      // A connect right after startMonitor(): stopping nothing here let the scan come up
+      // during LE Create Connection, which several controllers reject or slow down.
+      await this.startPromise.catch(() => false);
+    }
     if (this.scannerState == "scanning") {
       this.scannerState = "stopping";
       return await this.stopNobleScan();
@@ -87,7 +108,11 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   ): Promise<boolean> {
     try {
       if (this.noble !== undefined) {
-        await this.noble.startScanningAsync(this.uuids, allowDuplicates);
+        await withTimeout(
+          this.noble.startScanningAsync(this.uuids, allowDuplicates),
+          SCAN_COMMAND_TIMEOUT_MS,
+          "startScanning"
+        );
         this.scannerState = "scanning";
         return true;
       }
@@ -103,14 +128,17 @@ export class NobleScanner extends EventEmitter implements ScannerInterface {
   private async stopNobleScan(): Promise<boolean> {
     try {
       if (this.noble !== undefined) {
-        await this.noble.stopScanningAsync();
+        await withTimeout(this.noble.stopScanningAsync(), SCAN_COMMAND_TIMEOUT_MS, "stopScanning");
         this.scannerState = "stopped";
         return true;
       }
     } catch (error) {
       log.error(error);
       if (this.scannerState == "stopping") {
-        this.scannerState = "scanning";
+        // Unknown outcome: report stopped so the next startScan() re-issues the command
+        // instead of being refused forever by a phantom "scanning" state.
+        this.scannerState = "stopped";
+        this.emit("scanStop");
       }
     }
     return false;

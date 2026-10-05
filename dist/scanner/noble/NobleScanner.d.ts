@@ -12,6 +12,8 @@ export declare class NobleScanner extends EventEmitter implements ScannerInterfa
     private readonly onStateChangeBound;
     private readonly onScanStartBound;
     private readonly onScanStopBound;
+    /** In-flight start, so a stop requested meanwhile can wait for it instead of no-op'ing. */
+    private startPromise?;
     constructor(uuids?: string[]);
     protected createNoble(): void;
     protected initNoble(): void;

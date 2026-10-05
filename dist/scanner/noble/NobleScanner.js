@@ -8,7 +8,15 @@ const noble_1 = __importDefault(require("@abandonware/noble"));
 const events_1 = require("events");
 const NobleDevice_1 = require("./NobleDevice");
 const logger_1 = require("../../util/logger");
+const timingUtil_1 = require("../../util/timingUtil");
 const log = (0, logger_1.createLogger)("ttlock:scanner");
+/**
+ * Bound for noble's start/stopScanningAsync, which wait for a scanStart/scanStop event the
+ * controller may never send (e.g. scan enable rejected while LE Create Connection is
+ * pending). Unbounded, scannerState stayed "starting"/"stopping" and every later
+ * startScan()/stopScan() returned false: monitoring was dead until restart.
+ */
+const SCAN_COMMAND_TIMEOUT_MS = 5000;
 class NobleScanner extends events_1.EventEmitter {
     constructor(uuids = []) {
         super();
@@ -50,7 +58,13 @@ class NobleScanner extends events_1.EventEmitter {
         if (this.scannerState == "unknown" || this.scannerState == "stopped") {
             if (this.nobleState == "poweredOn") {
                 this.scannerState = "starting";
-                return await this.startNobleScan(passive);
+                this.startPromise = this.startNobleScan(passive);
+                try {
+                    return await this.startPromise;
+                }
+                finally {
+                    this.startPromise = undefined;
+                }
             }
             else {
                 return false;
@@ -59,6 +73,11 @@ class NobleScanner extends events_1.EventEmitter {
         return false;
     }
     async stopScan() {
+        if (this.scannerState == "starting" && this.startPromise !== undefined) {
+            // A connect right after startMonitor(): stopping nothing here let the scan come up
+            // during LE Create Connection, which several controllers reject or slow down.
+            await this.startPromise.catch(() => false);
+        }
         if (this.scannerState == "scanning") {
             this.scannerState = "stopping";
             return await this.stopNobleScan();
@@ -68,7 +87,7 @@ class NobleScanner extends events_1.EventEmitter {
     async startNobleScan(allowDuplicates = true) {
         try {
             if (this.noble !== undefined) {
-                await this.noble.startScanningAsync(this.uuids, allowDuplicates);
+                await (0, timingUtil_1.withTimeout)(this.noble.startScanningAsync(this.uuids, allowDuplicates), SCAN_COMMAND_TIMEOUT_MS, "startScanning");
                 this.scannerState = "scanning";
                 return true;
             }
@@ -84,7 +103,7 @@ class NobleScanner extends events_1.EventEmitter {
     async stopNobleScan() {
         try {
             if (this.noble !== undefined) {
-                await this.noble.stopScanningAsync();
+                await (0, timingUtil_1.withTimeout)(this.noble.stopScanningAsync(), SCAN_COMMAND_TIMEOUT_MS, "stopScanning");
                 this.scannerState = "stopped";
                 return true;
             }
@@ -92,7 +111,10 @@ class NobleScanner extends events_1.EventEmitter {
         catch (error) {
             log.error(error);
             if (this.scannerState == "stopping") {
-                this.scannerState = "scanning";
+                // Unknown outcome: report stopped so the next startScan() re-issues the command
+                // instead of being refused forever by a phantom "scanning" state.
+                this.scannerState = "stopped";
+                this.emit("scanStop");
             }
         }
         return false;

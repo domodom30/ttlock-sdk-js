@@ -8,9 +8,16 @@ import {
 } from "../DeviceInterface";
 import { NobleDescriptor } from "./NobleDescriptor";
 import { NobleDevice } from "./NobleDevice";
+import { withTimeout } from "../../util/timingUtil";
 
 /** Matches the 5 s ceiling the previous 1 ms-poll loop enforced. */
 const WRITE_TIMEOUT_MS = 5000;
+
+/**
+ * Bound for the GATT exchanges noble never fails on a dropped link (read, subscribe,
+ * descriptor discovery): without it a disconnect mid-exchange hung connect() for good.
+ */
+const GATT_OP_TIMEOUT_MS = 5000;
 
 export class NobleCharacteristic
   extends EventEmitter
@@ -62,7 +69,11 @@ export class NobleCharacteristic
       throw new Error("NobleDevice is not connected");
     }
     try {
-      const descriptors = await this.characteristic.discoverDescriptorsAsync();
+      const descriptors = await withTimeout(
+        this.characteristic.discoverDescriptorsAsync(),
+        GATT_OP_TIMEOUT_MS,
+        "Characteristic discoverDescriptors"
+      );
       this.descriptors = new Map();
       descriptors.forEach((descriptor) => {
         this.descriptors.set(
@@ -88,7 +99,7 @@ export class NobleCharacteristic
     }
     this.isReading = true;
     try {
-      this.lastValue = await this.characteristic.readAsync();
+      this.lastValue = await withTimeout(this.characteristic.readAsync(), GATT_OP_TIMEOUT_MS, "Characteristic read");
     } catch (error) {
       console.error(error);
     }
@@ -136,7 +147,7 @@ export class NobleCharacteristic
   }
 
   async subscribe(): Promise<void> {
-    await this.characteristic.subscribeAsync();
+    await withTimeout(this.characteristic.subscribeAsync(), GATT_OP_TIMEOUT_MS, "Characteristic subscribe");
   }
 
   private onRead(data: Buffer) {

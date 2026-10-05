@@ -1,9 +1,15 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from 'events';
 export declare class NobleWebsocketBinding extends EventEmitter {
     private ws;
     private auth;
     private connected;
     private wasReady;
+    /** Last adapter state forwarded to noble — every change is forwarded, repeats are not. */
+    private lastState;
+    /** onerror and onclose both fire for one failure: handle it once. */
+    private closed;
+    /** Peripherals connected when the link dropped: the gateway may still hold their BLE link. */
+    private orphanedSessions;
     private buffer;
     private startScanCommand;
     private peripherals;
@@ -14,11 +20,20 @@ export declare class NobleWebsocketBinding extends EventEmitter {
     private onOpen;
     private onClose;
     private onMessage;
+    private forwardState;
     private sendCommand;
     startScanning(serviceUuids: string[], allowDuplicates?: boolean): void;
     stopScanning(): void;
     connect(deviceUuid: string): void;
     disconnect(deviceUuid: string): void;
+    /**
+     * Called by noble when a connect attempt is abandoned (NobleDevice's connect timeout).
+     * Without it noble's call threw, the error was swallowed, and `connecting` stayed true:
+     * connect() then ignored every later attempt without sending anything to the gateway,
+     * until the gateway happened to report a connect/disconnect for that peripheral on its
+     * own — hours of silent connect failures.
+     */
+    cancelConnect(deviceUuid: string): void;
     updateRssi(deviceUuid: string): void;
     discoverServices(deviceUuid: string, uuids: string[]): void;
     discoverIncludedServices(deviceUuid: string, serviceUuid: string, serviceUuids: string[]): void;

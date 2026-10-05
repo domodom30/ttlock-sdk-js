@@ -14,7 +14,7 @@ import { LockedStatus } from '../constant/LockedStatus';
 import { LockSoundVolume } from '../constant/LockSoundVolume';
 import { PassageModeOperate } from '../constant/PassageModeOperate';
 import { TTLockData, TTLockPrivateData, TTLockPsPath } from '../store/TTLockData';
-import { waitForEvent } from '../util/timingUtil';
+import { waitForEvent, withTimeout } from '../util/timingUtil';
 import { createLogger } from '../util/logger';
 import { TTBluetoothDevice } from './TTBluetoothDevice';
 import { LockParamsChanged, NoMoreOperationDataError, PasscodeOperationError, TTLockApi } from './TTLockApi';
@@ -45,6 +45,8 @@ export class TTLock extends TTLockApi implements TTLock {
   private connected: boolean;
   private skipDataRead: boolean = false;
   private connecting: boolean = false;
+  /** Set when connect() ran out of budget, so a late onConnected() tears the session down. */
+  private connectAborted: boolean = false;
   // Pending auto-lock timer armed after an unlock(). Tracked so it can be
   // cancelled on a manual lock/unlock or a disconnect, instead of firing a
   // stale 'locked' event (and stacking duplicates across rapid unlocks).
@@ -171,7 +173,14 @@ export class TTLock extends TTLockApi implements TTLock {
     throw new Error('Admin login failed');
   }
 
-  async connect(skipDataRead: boolean = false, timeout: number = 15): Promise<boolean> {
+  /**
+   * @param timeout Overall budget in seconds, covering the BLE link, GATT setup and the
+   * post-connect data reads. Past it the attempt is abandoned *and torn down*: before,
+   * the BLE setup itself was unbounded (connect() could hang forever with `connecting`
+   * stuck) and a late onConnected() still completed afterwards, leaving an open session
+   * nobody owned — the lock stopped advertising until it dropped the link itself.
+   */
+  async connect(skipDataRead: boolean = false, timeout: number = 20): Promise<boolean> {
     if (this.connecting) {
       log('Connect already in progress');
       return false;
@@ -180,7 +189,9 @@ export class TTLock extends TTLockApi implements TTLock {
       return true;
     }
     this.connecting = true;
+    this.connectAborted = false;
     this.skipDataRead = skipDataRead;
+    let settled = false;
     // try/finally so a throw from device.connect() (or the wait loop) still
     // clears `connecting`; otherwise it stays true and every later connect()
     // is permanently rejected by the guard above.
@@ -188,13 +199,17 @@ export class TTLock extends TTLockApi implements TTLock {
       // Settled before device.connect() resolves: onConnected() runs on the
       // device's 'connected' event and is not awaited by it, so the outcome can
       // land while we are still setting up the wait.
+      const deadline = Date.now() + timeout * 1000;
       const completed = waitForEvent(this, ['connected', 'disconnected'], timeout * 1000);
-      const connected = await this.device.connect();
-      if (connected) {
+      const connected = await withTimeout(this.device.connect(), timeout * 1000, 'BLE connect').catch((error) => {
+        log.warn('Lock connect aborted:', error.message);
+        return false;
+      });
+      if (connected && Date.now() < deadline) {
         log('Lock waiting for connection to be completed');
         // Resolves the moment onConnected finishes (or the lock drops), instead
         // of on the next tick of a 100 ms poll.
-        await completed.promise;
+        settled = (await completed.promise) !== undefined;
       } else {
         log('Lock connect failed');
         completed.cancel();
@@ -202,6 +217,11 @@ export class TTLock extends TTLockApi implements TTLock {
     } finally {
       this.skipDataRead = false;
       this.connecting = false;
+    }
+    if (!settled && !this.connected) {
+      // Out of budget: make sure a late success cannot open a session behind our back.
+      this.connectAborted = true;
+      await this.device.disconnect().catch(() => undefined);
     }
     // it is possible that even tho device initially connected, reading initial data will disconnect
     return this.connected;
@@ -484,6 +504,8 @@ export class TTLock extends TTLockApi implements TTLock {
       log('========= lock');
       const lockData = await this.lockCommand(psFromLock);
       log('========= lock', lockData);
+      this.statusUnverified = false;
+      this.confirmedLockAt = Date.now();
       // A manual lock supersedes any pending auto-lock timer.
       if (this.autoLockTimer) {
         clearTimeout(this.autoLockTimer);
@@ -517,6 +539,8 @@ export class TTLock extends TTLockApi implements TTLock {
       const unlockData = await this.unlockCommand(psFromLock);
       log('========= unlock', unlockData);
       this.lockedStatus = LockedStatus.UNLOCKED;
+      this.statusUnverified = false;
+      this.confirmedLockAt = 0;
       this.emit('unlocked', this);
       // if autolock is on, then emit locked event after the timeout has passed
       if (this.autoLockTimer) {
@@ -541,6 +565,13 @@ export class TTLock extends TTLockApi implements TTLock {
   /**
    * Get the status of the lock (locked or unlocked)
    */
+  /**
+   * Get the status of the lock (locked or unlocked)
+   *
+   * @param noCache Force a live query. In that mode a failed query throws instead of
+   * returning the cached value: callers that ask for a live read must be able to tell a
+   * fresh result from a stale one.
+   */
   async getLockStatus(noCache: boolean = false): Promise<LockedStatus> {
     if (!this.initialized) {
       throw new Error('Lock is in pairing mode');
@@ -555,23 +586,45 @@ export class TTLock extends TTLockApi implements TTLock {
 
       try {
         log('========= check lock status');
-        this.lockedStatus = await this.searchBycicleStatusCommand();
-        this.statusUnverified = false;
+        this.applyQueriedStatus(await this.searchBycicleStatusCommand());
         log('========= check lock status', this.lockedStatus);
       } catch (error) {
         log.error('Error getting lock status', error);
+        if (noCache) {
+          throw error;
+        }
       }
     }
 
-    if (oldStatus != this.lockedStatus) {
-      if (this.lockedStatus == LockedStatus.LOCKED) {
-        this.emit('locked', this);
-      } else {
-        this.emit('unlocked', this);
-      }
-    }
+    this.emitStatusChange(oldStatus);
 
     return this.lockedStatus;
+  }
+
+  /**
+   * Adopt a status read from the lock. Only 0/1 are real answers: anything else (short
+   * frame → -1, unexpected value) used to be stored as verified and then reported as
+   * "unlocked" by the LOCKED ? 'locked' : 'unlocked' emit.
+   */
+  private applyQueriedStatus(status: number): void {
+    if (status == LockedStatus.LOCKED || status == LockedStatus.UNLOCKED) {
+      this.lockedStatus = status;
+      this.statusUnverified = false;
+    } else {
+      log.warn('Unexpected lock status value', status, '- keeping status unverified');
+      this.statusUnverified = true;
+    }
+  }
+
+  private emitStatusChange(oldStatus: LockedStatus): void {
+    if (oldStatus == this.lockedStatus) {
+      return;
+    }
+    if (this.lockedStatus == LockedStatus.LOCKED) {
+      this.emit('locked', this);
+    } else if (this.lockedStatus == LockedStatus.UNLOCKED) {
+      this.emit('unlocked', this);
+    }
   }
 
   async getAutolockTime(noCache: boolean = false): Promise<number> {
@@ -1953,15 +2006,12 @@ export class TTLock extends TTLockApi implements TTLock {
           // Locked/unlocked status
           log('========= check lock status');
           const oldStatus = this.lockedStatus;
-          this.lockedStatus = await this.searchBycicleStatusCommand();
-          this.statusUnverified = false;
+          this.applyQueriedStatus(await this.searchBycicleStatusCommand());
           log('========= check lock status', this.lockedStatus);
           // Propagate a corrected status to event-based consumers: the advertising
           // path no longer asserts LOCKED, so a genuine re-lock is only discovered
           // by this active query and would otherwise never be signalled.
-          if (oldStatus != this.lockedStatus) {
-            this.emit(this.lockedStatus == LockedStatus.LOCKED ? 'locked' : 'unlocked', this);
-          }
+          this.emitStatusChange(oldStatus);
         }
 
         if (this.featureList.has(FeatureValue.AUDIO_MANAGEMENT) && this.lockSound == AudioManage.UNKNOWN) {
@@ -1974,18 +2024,24 @@ export class TTLock extends TTLockApi implements TTLock {
         log.error('Failed reading all general data from lock', error);
         // TODO: judge the error and fail connect
       }
-    } else {
-      if (this.device.isUnlock) {
-        this.lockedStatus = LockedStatus.UNLOCKED;
-      } else {
-        this.lockedStatus = LockedStatus.LOCKED;
-      }
+    } else if (!this.isPaired()) {
+      this.lockedStatus = this.device.isUnlock ? LockedStatus.UNLOCKED : LockedStatus.LOCKED;
     }
+    // skipDataRead on a paired lock: keep what updateFromTTDevice() derived from the
+    // advertisements. Re-asserting LOCKED from a cleared unlock bit here overwrote a
+    // verified status with a guess — the very inference updateFromTTDevice refuses.
 
     // Emit before 'connected' so a consumer that persists on 'dataUpdated' has
     // the cache written by the time it starts issuing commands.
     if (dataChanged) {
       this.emit('dataUpdated', this);
+    }
+
+    if (this.connectAborted) {
+      // connect() gave up on this attempt already; nobody is waiting for this session.
+      log.warn('Late connection after connect() timed out, disconnecting');
+      await this.device.disconnect().catch(() => undefined);
+      return;
     }
 
     // are we still connected ? It is possible the lock will disconnect while reading general data

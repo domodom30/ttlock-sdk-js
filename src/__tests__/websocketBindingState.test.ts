@@ -89,3 +89,71 @@ describe('NobleWebsocketBinding state announcements', () => {
     expect(disconnected).toEqual(['abc']);
   });
 });
+
+/**
+ * noble calls bindings.cancelConnect() when NobleDevice gives up on a connect. Before the
+ * binding implemented it the call threw (swallowed) and `connecting` stayed true, so every
+ * later connect() was dropped without reaching the gateway.
+ */
+describe('NobleWebsocketBinding cancelConnect', () => {
+  function withPeripheral() {
+    const { binding } = makeBinding();
+    binding.peripherals.set('abc', {
+      uuid: 'abc',
+      address: 'AA:BB:CC:DD:EE:FF',
+      rssi: -60,
+      connected: false,
+      connecting: false,
+      bufferedConnect: false
+    });
+    return binding;
+  }
+  const sentActions = (binding: any) => binding.ws.sent.map((m: string) => JSON.parse(m).action);
+
+  it('lets the next connect reach the gateway after an unanswered one', () => {
+    const binding = withPeripheral();
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+
+    binding.connect('abc');
+    binding.connect('abc'); // still pending: ignored, as before
+    expect(sentActions(binding)).toEqual(['connect']);
+
+    binding.cancelConnect('abc');
+    binding.connect('abc');
+
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect', 'connect']);
+    expect(binding.peripherals.get('abc').connecting).toBe(true);
+  });
+
+  it('drops a connect still buffered while the link is down instead of sending it later', () => {
+    const binding = withPeripheral();
+
+    binding.connect('abc'); // not authenticated yet: buffered
+    binding.cancelConnect('abc');
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+
+    expect(sentActions(binding)).toEqual([]);
+    expect(binding.peripherals.get('abc')).toMatchObject({ connecting: false, bufferedConnect: false });
+  });
+
+  it('clears the re-connect buffered by a link drop', () => {
+    const binding = withPeripheral();
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+    binding.connect('abc');
+    binding.ws.onclose(); // re-buffers the pending connect (bufferedConnect = true)
+
+    binding.cancelConnect('abc');
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+
+    expect(sentActions(binding)).toEqual(['connect']);
+    expect(binding.peripherals.get('abc')).toMatchObject({ connecting: false, bufferedConnect: false });
+  });
+
+  it('ignores an unknown peripheral', () => {
+    const binding = withPeripheral();
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+
+    expect(() => binding.cancelConnect('nope')).not.toThrow();
+    expect(sentActions(binding)).toEqual([]);
+  });
+});

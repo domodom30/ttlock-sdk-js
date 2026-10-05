@@ -1,5 +1,83 @@
 # Changelog
 
+## [0.8.5]
+
+### Fixed
+
+- **Connections that hung forever.** Noble never fails a GATT exchange when the link drops
+  in the middle of it, so `discoverAll`, characteristic discovery, `read`, `subscribe`,
+  `disconnect` and `start/stopScanning` could wait indefinitely — leaving `connecting` or the
+  scanner state stuck and every later connect/scan refused until restart. All of them are now
+  bounded (`withTimeout`), and `TTLock.connect()` enforces one overall budget (default 20 s)
+  covering the BLE link, GATT setup and the post-connect reads.
+- **Orphan sessions after a timed-out connect.** A late `onConnected()` used to complete after
+  `connect()` had already returned `false`, leaving a BLE session nobody owned (the lock stops
+  advertising). It is now torn down.
+- **Stale `connected` flag.** A lost `disconnect` event (adapter reset, gateway drop, timed-out
+  disconnect) made `NobleDevice.connect()` refuse every later attempt; the flag is now
+  reconciled with the peripheral state, and a disconnect noble never confirms is completed
+  locally after 3 s.
+- **Gateway (websocket) mode:**
+  - each advertisement no longer resets a peripheral's `connected`/`connecting` flags (a link
+    drop then went unreported and noble kept the lock "connected" forever);
+  - every adapter state change is forwarded, not only the first after a (re)connect;
+  - `onerror` + `onclose` of one failure are handled once;
+  - GATT commands queued while the link is down are dropped instead of replayed after
+    re-authentication (a stale unlock write could fire long after the caller gave up), and BLE
+    sessions the gateway may have kept through the drop are released.
+- **"Unprocessed responses" for the rest of a session.** A leftover frame (late reply after a
+  timeout, extra status frame) failed every later command; leftovers are now discarded before
+  each write and after each exchange. `sendCommand` throws when the link is gone instead of
+  returning nothing.
+- **Unknown lock status reported as unlocked.** A status other than 0/1 is no longer stored as
+  verified nor emitted as `unlocked`; `getLockStatus(true)` now throws on a failed live read
+  instead of silently returning the cache.
+- **LOCK → UNLOCK → LOCK flicker.** The advertised unlock bit, still set for a while after an
+  unlock, is ignored for 20 s after a confirmed `lock()`. `lock()`/`unlock()` clear
+  `statusUnverified`, and `connect(true)` on a paired lock no longer asserts LOCKED from a
+  cleared advertising bit.
+- `unlock()` no longer reports success on a status frame that says LOCKED.
+- Advertisements no longer tear down and re-add the device listeners each time.
+- A second `prepareBTService()` call reports the real adapter readiness.
+
+## [0.8.4]
+
+### Fixed
+
+- **Battery level briefly jumping to 100 %.** Right after a BLE session ends, the lock
+  advertises a bogus 100 for ~1-2 s (same frame, only the battery byte differs: `0x64`
+  instead of the real `0x57`), making the battery sensor go 87 → 100 → 87. Advertised rises
+  of more than 5 points are now held back and only applied once advertised for 60 s (e.g.
+  after replacing the batteries); drops and small fluctuations are applied immediately.
+  A warning is logged when a rise is held back or confirmed.
+
+### Removed
+
+- The temporary battery diagnostic added in 0.8.3 (it identified the cause above).
+
+## [0.8.3]
+
+### Added
+
+- **Temporary diagnostic:** `TTBluetoothDevice` logs a warning with the raw manufacturer data
+  whenever the advertised battery level jumps by more than 5 points (observed briefly reading
+  100 around a connection before returning to 87/88). To be removed once the cause is found.
+
+## [0.8.2]
+
+### Fixed
+
+- **Gateway (websocket) mode: connects silently ignored for hours after one unanswered
+  attempt.** When the gateway did not answer a connect within `NobleDevice`'s 10 s budget,
+  noble called `cancelConnect()` on the binding, which `NobleWebsocketBinding` did not
+  implement. The `TypeError` was swallowed and the peripheral's `connecting` flag stayed
+  `true`, so `connect()` dropped every later attempt without sending anything to the
+  gateway — until the gateway reported a connect/disconnect for that peripheral on its own.
+  `cancelConnect()` now clears `connecting`/`bufferedConnect` and sends a `disconnect` so the
+  gateway aborts the attempt in flight (the protocol has no cancel action). A connect still
+  buffered while the link is down is dropped instead of being sent after re-authentication.
+- `NobleDevice.connect()` now logs a failing `cancelConnect()` instead of swallowing it.
+
 ## [0.8.1]
 
 Command execution latency pass. No API breakage for consumers: everything below is either
