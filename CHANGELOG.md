@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.7]
+
+### Fixed
+
+- **Reconnect torn down by the previous session's disconnect ack (gateway mode).** The
+  gateway acks a `disconnect` only once the BLE link is really down, which can take up to
+  the 6 s supervision timeout. Since 0.8.6 the session was closed locally after 2 s and the
+  next `connect` was sent at once: the gateway served it on the dying link, then the late
+  ack tore down the *new* session — the first lock/unlock attempt after each session failed
+  (`Disconnected from lock` right after connecting). A `connect` requested while our
+  disconnect is unacked is now held back until the ack, or 7 s at most for gateways that
+  never ack; the ack then ends only the old session. Closing locally after 2 s is kept, so
+  ending a session is still fast.
+
 ## [0.8.6]
 
 ### Fixed
