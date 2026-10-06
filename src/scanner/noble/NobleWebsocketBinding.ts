@@ -26,6 +26,16 @@ const REPLAYABLE_ACTIONS = new Set(['connect', 'startScanning', 'stopScanning'])
  */
 const DISCONNECT_ACK_TIMEOUT_MS = 2000;
 
+/**
+ * How long a connect() requested after a `disconnect` is held back waiting for the gateway's
+ * real ack. The gateway (esp32-ble-gateway >= 1.3.3) only acks once NimBLE reports the link
+ * down, which can take up to the 6 s supervision timeout: a connect sent before that is
+ * served on the dying link, and the late ack then tears down the *new* session ("Disconnected
+ * from lock" right after connecting). Past this delay (gateway that never acks) the connect is
+ * sent anyway.
+ */
+const DISCONNECT_GRACE_MS = 7000;
+
 type Peripheral = {
   uuid: string;
   address: string;
@@ -79,6 +89,13 @@ export class NobleWebsocketBinding extends EventEmitter {
   private orphanedSessions: Set<string> = new Set();
   /** Pending disconnect acks, keyed by peripheral uuid (see DISCONNECT_ACK_TIMEOUT_MS). */
   private disconnectAckTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  /**
+   * Disconnects sent but not yet acked by the gateway, with their grace timer
+   * (see DISCONNECT_GRACE_MS). While pending, a connect() for the same peripheral is deferred.
+   */
+  private pendingDisconnects: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  /** connect() requests held back by a pending disconnect. */
+  private deferredConnects: Set<string> = new Set();
   private buffer: any[];
   private startScanCommand: any | null;
   private peripherals: Map<string, Peripheral>;
@@ -134,8 +151,15 @@ export class NobleWebsocketBinding extends EventEmitter {
     }
     this.closed = true;
     this.auth = false;
-    // The drop below ends every session itself: pending disconnect acks are moot.
+    // The drop below ends every session itself: pending disconnect acks are moot, and a
+    // connect held back by one can go to the buffer (replayed after re-authentication).
     this.clearDisconnectAckTimers();
+    for (const grace of this.pendingDisconnects.values()) {
+      clearTimeout(grace);
+    }
+    this.pendingDisconnects.clear();
+    const deferred = [...this.deferredConnects];
+    this.deferredConnects.clear();
     const wasConnected = this.connected;
     this.connected = false;
     this.wasReady = false;
@@ -168,6 +192,9 @@ export class NobleWebsocketBinding extends EventEmitter {
         peripheral.bufferedConnect = true;
         this.connect(peripheralUuid);
       }
+    }
+    for (const peripheralUuid of deferred) {
+      this.connect(peripheralUuid);
     }
   }
 
@@ -261,11 +288,16 @@ export class NobleWebsocketBinding extends EventEmitter {
       this.emit('connect', peripheralUuid);
     } else if (type === 'disconnect') {
       this.clearDisconnectAckTimer(peripheralUuid);
+      // Ack of our own disconnect: it ends the *previous* session. A connect deferred while
+      // it was pending has not touched the flags yet, so they still describe that session.
+      const acked = this.settlePendingDisconnect(peripheralUuid);
       const peripheral = this.peripherals.get(peripheralUuid);
       if (peripheral !== undefined) {
         if (!peripheral.connected && !peripheral.connecting && !peripheral.bufferedConnect) {
-          // Ack of a session already announced as ended (link drop, orphan release):
-          // re-emitting it would reach the consumer as a second, unrelated disconnect.
+          // Ack of a session already announced as ended (link drop, orphan release, local
+          // close after an overdue ack): re-emitting it would reach the consumer as a second,
+          // unrelated disconnect.
+          if (acked) this.flushDeferredConnect(peripheralUuid);
           return;
         }
         peripheral.connected = false;
@@ -273,6 +305,7 @@ export class NobleWebsocketBinding extends EventEmitter {
         peripheral.bufferedConnect = false;
       }
       this.emit('disconnect', peripheralUuid);
+      if (acked) this.flushDeferredConnect(peripheralUuid);
     } else if (type === 'rssiUpdate') {
       this.emit('rssiUpdate', peripheralUuid, rssi);
     } else if (type === 'servicesDiscover') {
@@ -356,6 +389,12 @@ export class NobleWebsocketBinding extends EventEmitter {
   connect(deviceUuid: string) {
     const peripheral = this.peripherals.get(deviceUuid);
 
+    if (peripheral !== undefined && this.pendingDisconnects.has(peripheral.uuid)) {
+      // Held back until the gateway acks the previous disconnect (see DISCONNECT_GRACE_MS).
+      log('Connect to', peripheral.uuid, 'deferred until the gateway acks the previous disconnect');
+      this.deferredConnects.add(peripheral.uuid);
+      return;
+    }
     if (peripheral !== undefined && !peripheral.connected && !peripheral.connecting) {
       peripheral.connecting = true;
       this.sendCommand({
@@ -369,11 +408,47 @@ export class NobleWebsocketBinding extends EventEmitter {
     const peripheral = this.peripherals.get(deviceUuid);
 
     if (peripheral !== undefined) {
+      // Only an authenticated link carries the command (sendCommand drops it otherwise):
+      // without it no ack can come, so nothing is left pending.
+      const sent = this.auth;
       this.sendCommand({
         action: 'disconnect',
         peripheralUuid: peripheral.uuid
       });
       this.armDisconnectAckTimer(peripheral.uuid);
+      if (sent) {
+        this.registerPendingDisconnect(peripheral.uuid);
+      }
+    }
+  }
+
+  private registerPendingDisconnect(peripheralUuid: string) {
+    const previous = this.pendingDisconnects.get(peripheralUuid);
+    if (previous !== undefined) {
+      clearTimeout(previous);
+    }
+    const grace = setTimeout(() => {
+      this.pendingDisconnects.delete(peripheralUuid);
+      log('No disconnect ack for', peripheralUuid, 'within', DISCONNECT_GRACE_MS, 'ms — releasing a deferred connect');
+      this.flushDeferredConnect(peripheralUuid);
+    }, DISCONNECT_GRACE_MS);
+    this.pendingDisconnects.set(peripheralUuid, grace);
+  }
+
+  /** @returns true when a disconnect of ours was pending (the message is its ack). */
+  private settlePendingDisconnect(peripheralUuid: string): boolean {
+    const grace = this.pendingDisconnects.get(peripheralUuid);
+    if (grace === undefined) {
+      return false;
+    }
+    clearTimeout(grace);
+    this.pendingDisconnects.delete(peripheralUuid);
+    return true;
+  }
+
+  private flushDeferredConnect(peripheralUuid: string) {
+    if (this.deferredConnects.delete(peripheralUuid)) {
+      this.connect(peripheralUuid);
     }
   }
 
@@ -429,6 +504,11 @@ export class NobleWebsocketBinding extends EventEmitter {
     }
     peripheral.connecting = false;
     peripheral.bufferedConnect = false;
+
+    // A connect held back by a pending disconnect never reached the gateway either.
+    if (this.deferredConnects.delete(peripheral.uuid)) {
+      return;
+    }
 
     // A connect still waiting in the buffer (link down) never reached the gateway: drop it
     // rather than let it fire after re-authentication for an attempt nobody awaits anymore.

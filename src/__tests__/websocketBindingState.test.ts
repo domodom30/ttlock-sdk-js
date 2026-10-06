@@ -186,7 +186,7 @@ describe('NobleWebsocketBinding disconnect ack', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('closes the session locally when the gateway never acks, so the next connect is sent', () => {
+  it('closes the session locally when the gateway never acks, and sends the next connect after the grace delay', () => {
     const { binding, disconnected } = connectedPeripheral();
 
     binding.disconnect('abc');
@@ -198,6 +198,72 @@ describe('NobleWebsocketBinding disconnect ack', () => {
     expect(binding.peripherals.get('abc')).toMatchObject({ connected: false, connecting: false, bufferedConnect: false });
 
     binding.connect('abc');
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect']);
+
+    jest.advanceTimersByTime(4999); // 6999 ms since the disconnect
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect']);
+    jest.advanceTimersByTime(1);
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect', 'connect']);
+    expect(binding.peripherals.get('abc').connecting).toBe(true);
+  });
+
+  it('holds a connect back until the real ack, which then ends nothing but the old session', () => {
+    const { binding, disconnected } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    jest.advanceTimersByTime(2000); // closed locally: the gateway is still tearing the link down
+    binding.connect('abc');
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect']);
+
+    // The real ack (NimBLE reports the old link down) arrives while the connect waits.
+    binding.emit('message', { type: 'disconnect', peripheralUuid: 'abc' });
+
+    expect(disconnected).toEqual(['abc']); // no second disconnect for the new attempt
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect', 'connect']);
+    expect(binding.peripherals.get('abc')).toMatchObject({ connected: false, connecting: true });
+
+    binding.emit('message', { type: 'connect', peripheralUuid: 'abc' });
+    jest.advanceTimersByTime(10000); // no leftover timer may end the new session
+    expect(disconnected).toEqual(['abc']);
+    expect(binding.peripherals.get('abc').connected).toBe(true);
+  });
+
+  it('connects straight away once the ack has arrived', () => {
+    const { binding, disconnected } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    binding.emit('message', { type: 'disconnect', peripheralUuid: 'abc' });
+    binding.connect('abc');
+
+    expect(disconnected).toEqual(['abc']);
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect', 'connect']);
+  });
+
+  it('drops a deferred connect that noble cancels', () => {
+    const { binding } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    jest.advanceTimersByTime(2000);
+    binding.connect('abc');
+    binding.cancelConnect('abc');
+    binding.emit('message', { type: 'disconnect', peripheralUuid: 'abc' });
+    jest.advanceTimersByTime(10000);
+
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect']);
+  });
+
+  it('replays a deferred connect after a websocket drop and re-authentication', () => {
+    const { binding } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    jest.advanceTimersByTime(2000);
+    binding.connect('abc');
+    binding.ws.onclose();
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect']);
+
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+    jest.advanceTimersByTime(10000);
+
     expect(sentActions(binding)).toEqual(['connect', 'disconnect', 'connect']);
   });
 

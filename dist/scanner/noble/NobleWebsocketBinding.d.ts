@@ -12,6 +12,13 @@ export declare class NobleWebsocketBinding extends EventEmitter {
     private orphanedSessions;
     /** Pending disconnect acks, keyed by peripheral uuid (see DISCONNECT_ACK_TIMEOUT_MS). */
     private disconnectAckTimers;
+    /**
+     * Disconnects sent but not yet acked by the gateway, with their grace timer
+     * (see DISCONNECT_GRACE_MS). While pending, a connect() for the same peripheral is deferred.
+     */
+    private pendingDisconnects;
+    /** connect() requests held back by a pending disconnect. */
+    private deferredConnects;
     private buffer;
     private startScanCommand;
     private peripherals;
@@ -28,6 +35,10 @@ export declare class NobleWebsocketBinding extends EventEmitter {
     stopScanning(): void;
     connect(deviceUuid: string): void;
     disconnect(deviceUuid: string): void;
+    private registerPendingDisconnect;
+    /** @returns true when a disconnect of ours was pending (the message is its ack). */
+    private settlePendingDisconnect;
+    private flushDeferredConnect;
     /**
      * Close the session locally if the gateway does not ack the disconnect in time. The
      * synthetic 'disconnect' resolves noble's disconnectAsync and resets the flags so the
