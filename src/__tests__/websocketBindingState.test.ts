@@ -157,3 +157,79 @@ describe('NobleWebsocketBinding cancelConnect', () => {
     expect(sentActions(binding)).toEqual([]);
   });
 });
+
+/**
+ * Gateway firmwares before esp32-ble-gateway 1.3.3 never answer a `disconnect` action. The
+ * binding then kept `connected` true and the next connect() was silently dropped by its
+ * `!connected` guard: the session must be closed locally once the ack is overdue.
+ */
+describe('NobleWebsocketBinding disconnect ack', () => {
+  function connectedPeripheral() {
+    const { binding } = makeBinding();
+    const disconnected: string[] = [];
+    binding.on('disconnect', (uuid: string) => disconnected.push(uuid));
+    binding.peripherals.set('abc', {
+      uuid: 'abc',
+      address: 'AA:BB:CC:DD:EE:FF',
+      rssi: -60,
+      connected: false,
+      connecting: false,
+      bufferedConnect: false
+    });
+    binding.emit('message', { type: 'stateChange', state: 'poweredOn' });
+    binding.connect('abc');
+    binding.emit('message', { type: 'connect', peripheralUuid: 'abc' });
+    return { binding, disconnected };
+  }
+  const sentActions = (binding: any) => binding.ws.sent.map((m: string) => JSON.parse(m).action);
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('closes the session locally when the gateway never acks, so the next connect is sent', () => {
+    const { binding, disconnected } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    jest.advanceTimersByTime(1999);
+    expect(disconnected).toEqual([]);
+
+    jest.advanceTimersByTime(1);
+    expect(disconnected).toEqual(['abc']);
+    expect(binding.peripherals.get('abc')).toMatchObject({ connected: false, connecting: false, bufferedConnect: false });
+
+    binding.connect('abc');
+    expect(sentActions(binding)).toEqual(['connect', 'disconnect', 'connect']);
+  });
+
+  it('uses the real ack when it arrives in time, once', () => {
+    const { binding, disconnected } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    binding.emit('message', { type: 'disconnect', peripheralUuid: 'abc' });
+    jest.advanceTimersByTime(5000);
+
+    expect(disconnected).toEqual(['abc']);
+    expect(binding.disconnectAckTimers.size).toBe(0);
+  });
+
+  it('ignores a late ack after closing locally', () => {
+    const { binding, disconnected } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    jest.advanceTimersByTime(2000);
+    binding.emit('message', { type: 'disconnect', peripheralUuid: 'abc' });
+
+    expect(disconnected).toEqual(['abc']);
+  });
+
+  it('lets a websocket drop end the session instead of the ack timer', () => {
+    const { binding, disconnected } = connectedPeripheral();
+
+    binding.disconnect('abc');
+    binding.ws.onclose();
+    jest.advanceTimersByTime(5000);
+
+    expect(disconnected).toEqual(['abc']);
+    expect(binding.disconnectAckTimers.size).toBe(0);
+  });
+});

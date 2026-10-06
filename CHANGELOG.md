@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.6]
+
+### Fixed
+
+- **Gateway sessions that never ended.** esp32-ble-gateway firmwares before 1.3.3 never
+  answer a `disconnect` action, so the websocket binding kept the peripheral `connected`: the
+  next `connect()` was silently dropped (never sent to the gateway) until the gateway happened
+  to report the link down, and every session ended with a 3 s `Peripheral disconnect timed
+  out` error. The binding now closes the session locally when the ack is 2 s overdue (a late
+  ack is ignored), so reconnects reach the gateway again.
+- **Noisy disconnect log.** A disconnect noble never confirms is still closed locally after
+  3 s, but is now reported as a one-line warning instead of an error with a stack trace.
+
 ## [0.8.5]
 
 ### Fixed

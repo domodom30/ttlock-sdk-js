@@ -17,6 +17,15 @@ const log = createLogger('ttlock:scanner');
  */
 const REPLAYABLE_ACTIONS = new Set(['connect', 'startScanning', 'stopScanning']);
 
+/**
+ * How long a `disconnect` waits for the gateway's ack before the session is closed locally.
+ * Gateway firmwares before esp32-ble-gateway 1.3.3 never answer a `disconnect` action:
+ * `peripheral.connected` then stayed true, so the next connect() was silently dropped (its
+ * `!connected` guard) until the gateway happened to report the link down. Kept below
+ * NobleDevice's own 3 s disconnect bound so noble resolves normally instead of timing out.
+ */
+const DISCONNECT_ACK_TIMEOUT_MS = 2000;
+
 type Peripheral = {
   uuid: string;
   address: string;
@@ -68,6 +77,8 @@ export class NobleWebsocketBinding extends EventEmitter {
   private closed: boolean;
   /** Peripherals connected when the link dropped: the gateway may still hold their BLE link. */
   private orphanedSessions: Set<string> = new Set();
+  /** Pending disconnect acks, keyed by peripheral uuid (see DISCONNECT_ACK_TIMEOUT_MS). */
+  private disconnectAckTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private buffer: any[];
   private startScanCommand: any | null;
   private peripherals: Map<string, Peripheral>;
@@ -123,6 +134,8 @@ export class NobleWebsocketBinding extends EventEmitter {
     }
     this.closed = true;
     this.auth = false;
+    // The drop below ends every session itself: pending disconnect acks are moot.
+    this.clearDisconnectAckTimers();
     const wasConnected = this.connected;
     this.connected = false;
     this.wasReady = false;
@@ -247,6 +260,7 @@ export class NobleWebsocketBinding extends EventEmitter {
       }
       this.emit('connect', peripheralUuid);
     } else if (type === 'disconnect') {
+      this.clearDisconnectAckTimer(peripheralUuid);
       const peripheral = this.peripherals.get(peripheralUuid);
       if (peripheral !== undefined) {
         if (!peripheral.connected && !peripheral.connecting && !peripheral.bufferedConnect) {
@@ -359,7 +373,46 @@ export class NobleWebsocketBinding extends EventEmitter {
         action: 'disconnect',
         peripheralUuid: peripheral.uuid
       });
+      this.armDisconnectAckTimer(peripheral.uuid);
     }
+  }
+
+  /**
+   * Close the session locally if the gateway does not ack the disconnect in time. The
+   * synthetic 'disconnect' resolves noble's disconnectAsync and resets the flags so the
+   * next connect() reaches the gateway; a late real ack is then ignored by onMessage
+   * ("ack of a session already announced as ended").
+   */
+  private armDisconnectAckTimer(peripheralUuid: string) {
+    this.clearDisconnectAckTimer(peripheralUuid);
+    const timer = setTimeout(() => {
+      this.disconnectAckTimers.delete(peripheralUuid);
+      const peripheral = this.peripherals.get(peripheralUuid);
+      if (peripheral === undefined || (!peripheral.connected && !peripheral.connecting && !peripheral.bufferedConnect)) {
+        return;
+      }
+      log('Gateway did not ack disconnect of', peripheralUuid, 'within', DISCONNECT_ACK_TIMEOUT_MS, 'ms — closing locally');
+      peripheral.connected = false;
+      peripheral.connecting = false;
+      peripheral.bufferedConnect = false;
+      this.emit('disconnect', peripheralUuid);
+    }, DISCONNECT_ACK_TIMEOUT_MS);
+    this.disconnectAckTimers.set(peripheralUuid, timer);
+  }
+
+  private clearDisconnectAckTimer(peripheralUuid: string) {
+    const timer = this.disconnectAckTimers.get(peripheralUuid);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.disconnectAckTimers.delete(peripheralUuid);
+    }
+  }
+
+  private clearDisconnectAckTimers() {
+    for (const timer of this.disconnectAckTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.disconnectAckTimers.clear();
   }
 
   /**
