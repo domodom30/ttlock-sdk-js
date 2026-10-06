@@ -10,6 +10,8 @@ export declare class NobleWebsocketBinding extends EventEmitter {
     private closed;
     /** Peripherals connected when the link dropped: the gateway may still hold their BLE link. */
     private orphanedSessions;
+    /** Pending disconnect acks, keyed by peripheral uuid (see DISCONNECT_ACK_TIMEOUT_MS). */
+    private disconnectAckTimers;
     private buffer;
     private startScanCommand;
     private peripherals;
@@ -26,6 +28,15 @@ export declare class NobleWebsocketBinding extends EventEmitter {
     stopScanning(): void;
     connect(deviceUuid: string): void;
     disconnect(deviceUuid: string): void;
+    /**
+     * Close the session locally if the gateway does not ack the disconnect in time. The
+     * synthetic 'disconnect' resolves noble's disconnectAsync and resets the flags so the
+     * next connect() reaches the gateway; a late real ack is then ignored by onMessage
+     * ("ack of a session already announced as ended").
+     */
+    private armDisconnectAckTimer;
+    private clearDisconnectAckTimer;
+    private clearDisconnectAckTimers;
     /**
      * Called by noble when a connect attempt is abandoned (NobleDevice's connect timeout).
      * Without it noble's call threw, the error was swallowed, and `connecting` stayed true:

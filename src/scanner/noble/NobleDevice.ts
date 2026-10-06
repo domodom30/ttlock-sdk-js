@@ -185,7 +185,10 @@ export class NobleDevice extends EventEmitter implements DeviceInterface {
         await withTimeout(this.peripheral.disconnectAsync(), DISCONNECT_TIMEOUT_MS, "Peripheral disconnect");
         return true;
       } catch (error) {
-        log.error(error);
+        // Handled case (closed locally below): one line, no stack trace — it used to be
+        // logged as an error on every session behind gateways that never ack a disconnect.
+        const reason = error instanceof Error ? error.message : String(error);
+        log.warn(`Peripheral disconnect not confirmed (${reason}) — link closed locally`);
         // Tear the link down locally either way: a disconnect that never reports back
         // must not leave `connected` set (see connect()).
         if (this.connected || this.connecting) {
