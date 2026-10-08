@@ -41,6 +41,16 @@ export interface TTBluetoothDevice {
   on(event: "dataReceived", listener: (command: CommandEnvelope) => void): this;
 }
 
+/**
+ * GATT string characteristics are fixed-size fields: the device name (2a00) of some
+ * locks comes back as "R6_b89c5f" followed by NUL bytes, which Buffer.toString()
+ * keeps. Returns undefined when nothing but padding is left.
+ */
+function stripNulPadding(text: string): string | undefined {
+  const stripped = text.replace(/\u0000+$/, "");
+  return stripped == "" ? undefined : stripped;
+}
+
 export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   device?: DeviceInterface;
   connected: boolean = false;
@@ -210,8 +220,22 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
    * can skip reading them. Ignored if it carries no usable value.
    */
   setBasicInfoCache(cache?: TTLockDeviceCache): void {
-    if (cache !== undefined && Object.values(cache).some((value) => typeof value == "string" && value != "")) {
-      this.basicInfoCache = cache;
+    if (cache === undefined) {
+      return;
+    }
+    // Lock data written before the padding was stripped carries it too. The cache is
+    // only copied when something was stripped: readBasicInfo() relies on its identity.
+    let cleaned = cache;
+    for (const [property, value] of Object.entries(cache)) {
+      if (typeof value == "string" && value.endsWith("\u0000")) {
+        if (cleaned === cache) {
+          cleaned = { ...cache };
+        }
+        Reflect.set(cleaned, property, stripNulPadding(value));
+      }
+    }
+    if (Object.values(cleaned).some((value) => typeof value == "string" && value != "")) {
+      this.basicInfoCache = cleaned;
     }
   }
 
@@ -563,7 +587,10 @@ export class TTBluetoothDevice extends TTDevice implements TTBluetoothDevice {
   private putCharacteristicValue(service: ServiceInterface, uuid: string, property: string): string | undefined {
     const value = service.characteristics.get(uuid);
     if (value !== undefined && value.lastValue !== undefined) {
-      const text = value.lastValue.toString();
+      const text = stripNulPadding(value.lastValue.toString());
+      if (text === undefined) {
+        return undefined;
+      }
       Reflect.set(this, property, text);
       return text;
     }

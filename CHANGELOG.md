@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.8]
+
+### Fixed
+
+- **Lock name padded with NUL bytes.** GATT string characteristics are fixed-size fields:
+  some locks return their device name (2a00) as `"R6_b89c5f"` followed by NUL bytes, which
+  `Buffer.toString()` kept — in `getName()`, in the persisted `deviceCache` and so in the
+  application's lock data. The trailing padding is now stripped when reading, and from a
+  `deviceCache` persisted before this fix.
+
 ## [0.8.7]
 
 ### Fixed

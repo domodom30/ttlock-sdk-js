@@ -190,3 +190,25 @@ describe('basic info GATT cache', () => {
     });
   });
 });
+
+describe('GATT string padding', () => {
+  const PADDED = 'R6_b89c5f' + '\u0000'.repeat(22);
+
+  it('strips the NUL padding of a fixed-size name characteristic', async () => {
+    const { btDevice } = makeDevice();
+    btDevice.device.services.get('1800').characteristics.set('2a00', { lastValue: Buffer.from(PADDED, 'utf8') });
+
+    await btDevice.readBasicInfo();
+
+    expect(btDevice.name).toBe('R6_b89c5f');
+    expect(btDevice.getBasicInfoCache().name).toBe('R6_b89c5f');
+    expect(btDevice.consumeFreshBasicInfo()).toBe(true);
+  });
+
+  it('cleans a cache persisted with the padding', () => {
+    const { btDevice } = makeDevice();
+    btDevice.setBasicInfoCache({ name: PADDED, model: 'R6' });
+
+    expect(btDevice.getBasicInfoCache()).toEqual({ name: 'R6_b89c5f', model: 'R6' });
+  });
+});
